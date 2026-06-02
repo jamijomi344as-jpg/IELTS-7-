@@ -45,8 +45,8 @@ export const DailyTracker = ({ studentName }: { studentName: string }) => {
         student_name: studentName,
         date_key: dateKey,
         completed_daily_tasks: newCompleted
-      }, { onConflict: ['student_name', 'date_key'] });
-  };
+}, { onConflict: 'student_name,date_key' }); // ✨ Massiv o'rniga bitta toza string qildik
+      };
 
   return (
     <div className="space-y-6">
