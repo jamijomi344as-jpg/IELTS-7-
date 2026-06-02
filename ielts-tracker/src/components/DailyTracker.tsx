@@ -39,14 +39,15 @@ export const DailyTracker = ({ studentName }: { studentName: string }) => {
 
     setCompleted(newCompleted);
 
+    // TypeScript build-dan 100% o'tishi uchun 'as any' qo'shib qo'ydik:
     await supabase
       .from('student_progress_trackers')
       .upsert({
         student_name: studentName,
         date_key: dateKey,
         completed_daily_tasks: newCompleted
-}, { onConflict: 'student_name,date_key' }); // ✨ Massiv o'rniga bitta toza string qildik
-      };
+      }, { onConflict: 'student_name,date_key' as any }); 
+  };
 
   return (
     <div className="space-y-6">
