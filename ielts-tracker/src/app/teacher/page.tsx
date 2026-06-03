@@ -9,7 +9,7 @@ type TestForm = {
   type: 'reading' | 'listening' | 'writing' | 'speaking';
   scheduled_date: string;
   content_url: string;
-  audio_url: string; // Yangi qo'shildi
+  audio_url: string;
   content_html: string;
   answer_key: string;
   writing_prompt_text: string;
@@ -25,9 +25,9 @@ export default function TeacherDashboard() {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // ALOHIDA FAYL YUKLASH STATE'LARI
-  const [contentFile, setContentFile] = useState<File | null>(null); // PDF yoki HTML uchun
-  const [audioFile, setAudioFile] = useState<File | null>(null);       // Listening MP3 uchun
+  // Yuklanadigan fayllar uchun alohida holatlar (state)
+  const [contentFile, setContentFile] = useState<File | null>(null); // PDF yoki HTML fayl uchun
+  const [audioFile, setAudioFile] = useState<File | null>(null);       // MP3 Audio uchun
   const [promptImageFile, setPromptImageFile] = useState<File | null>(null); // Writing rasm uchun
   
   const [message, setMessage] = useState('');
@@ -85,7 +85,7 @@ export default function TeacherDashboard() {
     let audioUrl = form.audio_url;
     let promptImageUrl = form.writing_prompt_image;
 
-    // 1. PDF yoki HTML Savollarni yuklash
+    // 1. PDF yoki HTML Test varog'ini yuklash
     if (contentFile) {
       const uploaded = await uploadAsset(contentFile, 'content');
       if (uploaded) contentUrl = uploaded;
@@ -103,7 +103,7 @@ export default function TeacherDashboard() {
       if (uploaded) promptImageUrl = uploaded;
     }
 
-    // HTML fayl kelsa matnini o'qib olish mantiqi
+    // Agar HTML fayl yuklansa, uning ichidagi matnni o'qib olish mantiqi
     let finalHtml = form.content_html;
     if (contentFile && contentFile.type === 'text/html') {
       finalHtml = await contentFile.text();
@@ -113,13 +113,13 @@ export default function TeacherDashboard() {
       ? form.answer_key.split(',').map((item) => item.trim()).filter(Boolean)
       : [];
 
-    // SUPABASE'GA YUKLASH
+    // Ma'lumotlarni bazaga (Supabase) yozish qismi
     const { data, error } = await supabase.from('tests').insert({
       title: form.title,
       type: form.type,
       scheduled_date: form.scheduled_date,
       content_url: contentUrl,
-      audio_url: form.type === 'listening' ? audioUrl : null, // Faqat listeningda audio bo'ladi
+      audio_url: form.type === 'listening' ? audioUrl : null,
       content: { html: finalHtml },
       writing_prompt_text: form.type === 'writing' ? form.writing_prompt_text : null,
       writing_prompt_image: form.type === 'writing' ? promptImageUrl : null,
@@ -217,7 +217,7 @@ export default function TeacherDashboard() {
                 />
               </div>
 
-              {/* READING & LISTENING UPLOAD DESIGN */}
+              {/* READING & LISTENING INPUTS */}
               {(form.type === 'reading' || form.type === 'listening') && (
                 <div className="space-y-3 p-4 bg-white/5 border border-white/10 rounded-xl">
                   <label className="text-sm font-semibold text-muted block">
@@ -228,25 +228,40 @@ export default function TeacherDashboard() {
                     accept="application/pdf,text/html"
                     onChange={(e) => setContentFile(e.target.files?.[0] || null)}
                     className="w-full text-sm text-white/80"
-                    required={!form.content_url} // Link bo'lmasa majburiy
+                    required={!form.content_url}
                   />
 
-                  {/* LISTENING UCHUN MAXSUS AUDIO YUKLASH */}
+                  {/* LISTENING TANLANIB, PDF YUKLANSA AUDIO MULTIMEDIA MANBAsi MAJBURIY QILINADI */}
                   {form.type === 'listening' && (
                     <div className="pt-2 border-t border-white/5 space-y-2">
-                      <label className="text-sm font-bold text-accent block">
+                      <label className="text-sm font-bold text-accent flex items-center gap-2 flex-wrap">
                         Upload Listening Audio Track (.mp3):
+                        {contentFile?.name.endsWith('.pdf') && (
+                          <span className="text-[11px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-md font-normal animate-pulse">
+                            * PDF tanlangani uchun audio majburiy!
+                          </span>
+                        )}
                       </label>
                       <input
                         type="file"
                         accept="audio/*"
                         onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
                         className="w-full text-sm text-white/80"
-                        required={!form.audio_url}
+                        required={form.type === 'listening' && contentFile?.name.endsWith('.pdf')}
                       />
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* QUESTION HTML (READING & LISTENING UCHUN IXTIYORIY) */}
+              {(form.type === 'reading' || form.type === 'listening') && (
+                <textarea
+                  placeholder="Optional printed question HTML text"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/50 transition-all font-medium h-24"
+                  value={form.content_html}
+                  onChange={(e) => setForm({ ...form, content_html: e.target.value })}
+                />
               )}
 
               {/* ANSWER KEY (READING & LISTENING UCHUN) */}
@@ -264,7 +279,7 @@ export default function TeacherDashboard() {
               {form.type === 'writing' && (
                 <div className="space-y-4 p-4 bg-white/5 border border-white/10 rounded-xl">
                   <select
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 outline-none text-white font-medium"
+                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/50 transition-all font-medium text-white"
                     value={form.writing_task}
                     onChange={(e) => setForm({ ...form, writing_task: e.target.value as TestForm['writing_task'] })}
                   >
@@ -285,7 +300,7 @@ export default function TeacherDashboard() {
                   )}
 
                   <textarea
-                    placeholder="Writing question prompt text..."
+                    placeholder="Writing question prompt text here..."
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none h-24 text-white font-medium"
                     value={form.writing_prompt_text}
                     onChange={(e) => setForm({ ...form, writing_prompt_text: e.target.value })}
@@ -310,7 +325,7 @@ export default function TeacherDashboard() {
                   <div>
                     <label className="text-xs font-bold text-accent block mb-1">PART 2 CUE CARD</label>
                     <textarea
-                      placeholder="Part 2 cue card prompt..."
+                      placeholder="Part 2 cue card prompt description..."
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 outline-none h-16 text-sm text-white"
                       value={form.speaking_part2}
                       onChange={(e) => setForm({ ...form, speaking_part2: e.target.value })}
@@ -320,7 +335,7 @@ export default function TeacherDashboard() {
                   <div>
                     <label className="text-xs font-bold text-yellow-500 block mb-1">PART 3 DISCUSSION</label>
                     <textarea
-                      placeholder="Part 3 evaluation questions..."
+                      placeholder="Part 3 follow-up evaluation questions..."
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 outline-none h-16 text-sm text-white"
                       value={form.speaking_part3}
                       onChange={(e) => setForm({ ...form, speaking_part3: e.target.value })}
@@ -341,7 +356,7 @@ export default function TeacherDashboard() {
           </div>
         </section>
 
-        {/* LIST HISTORY & SUBMISSIONS */}
+        {/* LIST HISTORY & SUBMISSIONS (Asl holida chiroyli saqlandi) */}
         <section className="lg:col-span-2 space-y-12">
           <div className="space-y-6">
             <h3 className="text-2xl font-bold flex items-center gap-2">
