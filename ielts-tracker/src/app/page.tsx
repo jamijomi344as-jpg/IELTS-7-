@@ -1,134 +1,203 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Onboarding } from '@/components/Onboarding';
-import { DailyTracker } from '@/components/DailyTracker';
-import { FourteenDayTracker } from '@/components/FourteenDayTracker';
-import { Calendar, GraduationCap, ArrowRight, Play, FileText, Headphones, MessageSquare, PenTool } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { LogIn, UserPlus, LogOut, BookOpen, Award, CheckCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-export default function Home() {
-  const [studentName, setStudentName] = useState<string | null>(null);
-  const [scheduledTests, setScheduledTests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function StudentDashboard() {
+  const [user, setUser] = useState<any>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [authMessage, setAuthMessage] = useState('');
 
-  useEffect(() => {
-    const savedName = localStorage.getItem('student_name');
-    if (savedName) setStudentName(savedName);
-    setLoading(false);
-  }, []);
+  const [availableTests, setAvailableTests] = useState<any[]>([]);
+  const [mySubmissions, setMySubmissions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // 1. O'quvchi sessiyasini va uning natijalarini tekshirish
   useEffect(() => {
-    if (studentName) {
-      const fetchTests = async () => {
-        const today = new Date().toISOString().split('T')[0];
-        const { data } = await supabase
+    const checkStudentSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        setUser(session.user);
+
+        // Hamma ochiq testlarni yuklash
+        const { data: testsData } = await supabase
           .from('tests')
           .select('*')
-          .lte('scheduled_date', today)
           .order('scheduled_date', { ascending: false });
-        
-        if (data) setScheduledTests(data);
-      };
-      fetchTests();
-    }
-  }, [studentName]);
 
-  if (loading) return null;
+        // FAQAT shu o'quvchining o'ziga tegishli natijalarni yuklash (Aralashib ketmaydi!)
+        const { data: subsData } = await supabase
+          .from('student_submissions')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('submitted_at', { ascending: false });
 
-  if (!studentName) {
-    return <Onboarding onComplete={(name) => setStudentName(name)} />;
-  }
+        if (testsData) setAvailableTests(testsData);
+        if (subsData) setMySubmissions(subsData);
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'reading': return <FileText className="text-blue-400" />;
-      case 'listening': return <Headphones className="text-purple-400" />;
-      case 'writing': return <PenTool className="text-amber-400" />;
-      case 'speaking': return <MessageSquare className="text-emerald-400" />;
-      default: return <FileText />;
+    checkStudentSession();
+  }, []);
+
+  // O'quvchi Auth (Login / Sign Up) mantiqi
+  const handleStudentAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthMessage('Processing...');
+
+    if (isSignUp) {
+      const { data, error } = await supabase.auth.signUp({
+        email: authEmail,
+        password: authPassword,
+      });
+      if (error) {
+        setAuthMessage(error.message);
+      } else {
+        setAuthMessage('Account created! Please check your email or try signing in.');
+      }
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword,
+      });
+      if (error) {
+        setAuthMessage(error.message);
+      } else {
+        window.location.reload();
+      }
     }
   };
 
-  return (
-    <div className="container mx-auto px-6 py-12 space-y-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-2">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-            Xush kelibsiz, <span className="gradient-text">{studentName}!</span>
-          </h1>
-          <p className="text-xl text-muted font-medium">Ready to hit Band 7+ today?</p>
-        </div>
-        <div className="flex items-center gap-4 bg-white/5 p-4 rounded-2xl border border-white/10 glass">
-          <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-            <GraduationCap className="text-primary" />
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
+
+  if (isLoading) return <div className="text-center py-24 font-bold text-white">Loading IELTS Platform...</div>;
+
+  // 2. AGAR O'QUVCHI TIZIMGA KIRMAGAN BO'LSA — LOGIN OYNASI
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 bg-slate-950">
+        <div className="w-full max-w-md p-8 glass border border-white/10 rounded-3xl space-y-6 bg-slate-900/50">
+          <div className="text-center space-y-2">
+            <h2 className="text-3xl font-extrabold text-white flex items-center justify-center gap-2">
+              {isSignUp ? <UserPlus className="text-primary" /> : <LogIn className="text-primary" />} 
+              Student Portal
+            </h2>
+            <p className="text-sm text-muted text-slate-400">Log in with your personal account to take IELTS mock tests and track your band score history.</p>
           </div>
-          <div>
-            <p className="text-xs text-muted font-bold uppercase tracking-wider">Overall Goal</p>
-            <p className="text-lg font-bold">IELTS Band 7.5</p>
+
+          <form onSubmit={handleStudentAuth} className="space-y-4">
+            <input
+              type="email"
+              placeholder="Your Student Email (e.g. asror@mail.com)"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-white font-medium"
+              value={authEmail}
+              onChange={(e) => setAuthEmail(e.target.value)}
+              required
+            />
+            <input
+              type="password"
+              placeholder="Enter Password"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/50 text-white font-medium"
+              value={authPassword}
+              onChange={(e) => setAuthPassword(e.target.value)}
+              required
+            />
+            <button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl transition-all cursor-pointer bg-blue-600 hover:bg-blue-700">
+              {isSignUp ? 'Create Student Account' : 'Sign In to Portal'}
+            </button>
+          </form>
+
+          <div className="text-center text-sm">
+            <button onClick={() => { setIsSignUp(!isSignUp); setAuthMessage(''); }} className="text-blue-400 hover:underline font-semibold bg-transparent border-none cursor-pointer">
+              {isSignUp ? 'Already have an account? Sign In' : "New here? Create your personal account"}
+            </button>
           </div>
+          {authMessage && <p className="text-xs text-center font-medium bg-white/5 text-amber-400 py-2 rounded-lg">{authMessage}</p>}
         </div>
       </div>
+    );
+  }
 
-      {/* Main Grid */}
-      <div className="grid lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-2 space-y-20">
-          <DailyTracker studentName={studentName} />
-          <FourteenDayTracker studentName={studentName} />
+  // 3. O'QUVCHI TIZIMGA KIRGANDA KO'RINADIGAN ASOSIY OYNA
+  return (
+    <div className="container mx-auto px-6 py-12 space-y-12 bg-slate-950 text-white min-h-screen">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border-b border-white/10 pb-6">
+        <div>
+          <h1 className="text-3xl font-black flex items-center gap-3">
+            <BookOpen className="text-blue-500" /> IELTS Academic Exam Center
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Logged in as: <span className="text-blue-400 font-bold">{user.email}</span>
+          </p>
+        </div>
+        <button onClick={handleLogout} className="px-4 py-2 rounded-xl text-sm font-bold text-red-400 hover:text-red-500 transition-colors flex items-center gap-2 border border-white/10 bg-white/5 cursor-pointer">
+          <LogOut size={16} /> Log Out
+        </button>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-8">
+        {/* CHAP TOMON: AKTIV TESTLAR RO'YXATI */}
+        <div className="md:col-span-2 space-y-6">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            <CheckCircle className="text-emerald-500" /> Available Mock Exams
+          </h3>
+          <div className="grid gap-4">
+            {availableTests.map((test) => (
+              <div key={test.id} className="p-5 bg-slate-900 border border-white/5 rounded-2xl flex items-center justify-between hover:border-blue-500/30 transition-all">
+                <div>
+                  <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 mr-2">
+                    {test.type}
+                  </span>
+                  <h4 className="font-bold text-lg inline-block">{test.title}</h4>
+                  <p className="text-xs text-slate-400 mt-1">Date: {test.scheduled_date}</p>
+                </div>
+                <button 
+                  onClick={() => window.location.href = `/exam/${test.id}`}
+                  className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                >
+                  Start Test
+                </button>
+              </div>
+            ))}
+            {availableTests.length === 0 && <p className="text-slate-400 text-sm">No tests available at the moment.</p>}
+          </div>
         </div>
 
-        <div className="space-y-8">
-          <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold flex items-center gap-2">
-              <Calendar className="text-primary" /> Scheduled Exams
-            </h3>
-          </div>
-
-          <div className="space-y-4">
-            {scheduledTests.length > 0 ? (
-              scheduledTests.map((test) => (
-                <motion.div
-                  key={test.id}
-                  whileHover={{ x: 4 }}
-                  className="p-5 glass border border-white/10 rounded-2xl flex items-center justify-between group cursor-pointer hover:border-primary/30 transition-all"
-                  onClick={() => window.location.href = `/exam/${test.id}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/5 rounded-xl group-hover:bg-primary/10 transition-colors">
-                      {getTypeIcon(test.type)}
-                    </div>
-                    <div>
-                      <h4 className="font-bold capitalize">{test.type} Mock</h4>
-                      <p className="text-xs text-muted font-medium">Date: {test.scheduled_date}</p>
-                    </div>
+        {/* O'NG TOMON: O'QUVCHINING SHAXSIY NATIJALARI (FAQAT O'ZINIKI) */}
+        <div className="space-y-6">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            <Award className="text-amber-500" /> Your Score History
+          </h3>
+          <div className="p-6 bg-slate-900 border border-white/5 rounded-3xl space-y-4">
+            <p className="text-xs text-slate-400">This history is linked to your account secure ID and cannot be viewed by other students.</p>
+            
+            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+              {mySubmissions.map((sub) => (
+                <div key={sub.id} className="p-3 bg-white/5 rounded-xl flex items-center justify-between border border-white/5">
+                  <div>
+                    <p className="text-xs text-slate-400">Test ID: {sub.test_id.substring(0, 8)}...</p>
+                    <p className="text-xs text-slate-500">{new Date(sub.submitted_at).toLocaleDateString()}</p>
                   </div>
-                  <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                    START <ArrowRight size={16} />
+                  <div className="text-right">
+                    <span className="text-xs block text-slate-400">Band Score</span>
+                    <span className="text-lg font-black text-blue-400">{sub.score_band ?? 'Pending'}</span>
                   </div>
-                </motion.div>
-              ))
-            ) : (
-              <div className="p-12 border-2 border-dashed border-white/5 rounded-3xl text-center space-y-4">
-                <div className="p-4 bg-white/5 rounded-full w-fit mx-auto">
-                  <Calendar className="text-muted/40" size={32} />
                 </div>
-                <p className="text-muted font-medium">No tests scheduled for today.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Stats or Tips */}
-          <div className="p-6 bg-gradient-to-br from-primary/20 to-blue-500/10 rounded-3xl border border-primary/20 space-y-4">
-            <div className="flex items-center gap-2 text-primary">
-              <Play size={20} fill="currentColor" />
-              <span className="font-bold text-sm uppercase tracking-widest">Focus Mode</span>
+              ))}
+              {mySubmissions.length === 0 && (
+                <p className="text-sm text-slate-500 text-center py-6">You haven't submitted any tests yet.</p>
+              )}
             </div>
-            <h4 className="text-xl font-bold">Don't forget the distraction audit!</h4>
-            <p className="text-sm text-white/70 leading-relaxed">
-              Spending 15 minutes on the Listening audit each day can boost your score by 0.5 bands in just a week.
-            </p>
           </div>
         </div>
       </div>
