@@ -1,5 +1,4 @@
 'use client';
-
-export function useWordCount(text: string) {
-  return text.trim().length === 0 ? 0 : text.trim().split(/\s+/).length;
+export function useWordCount(text: string): number {
+  return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
 }
