@@ -2,44 +2,44 @@
 
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, FileCode, FileText, AlertCircle, CheckCircle2, LogOut } from 'lucide-react';
+import { Plus, Trash2, FileText, Image, Headphones, AlertCircle, CheckCircle2, UploadCloud } from 'lucide-react';
 
 export default function TeacherTestManager() {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<'reading' | 'listening' | 'writing' | 'speaking'>('reading');
   const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split('T')[0]);
   
-  // Kontent yuklash usullari
-  const [contentType, setContentType] = useState<'pdf' | 'html_code'>('pdf');
-  const [contentHtml, setContentHtml] = useState('');
-  const [contentUrl, setContentUrl] = useState('');
-  const [audioUrl, setAudioUrl] = useState('');
+  // Fayllarni saqlash uchun state-lar
+  const [testFile, setTestFile] = useState<File | null>(null);
+  const [readingImage, setReadingImage] = useState<File | null>(null);
+  
+  // Listening Section audiolari uchun alohida state-lar
+  const [audioSec1, setAudioSec1] = useState<File | null>(null);
+  const [audioSec2, setAudioSec2] = useState<File | null>(null);
+  const [audioSec3, setAudioSec3] = useState<File | null>(null);
+  const [audioSec4, setAudioSec4] = useState<File | null>(null);
+
   const [uploading, setUploading] = useState(false);
-
-  // Standart PDF/Iframe testlar uchun javoblar kaliti
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [newAnswer, setNewAnswer] = useState('');
-
   const [message, setMessage] = useState<{ status: 'success' | 'error'; text: string } | null>(null);
 
-  // Kiritilayotgan kontent interaktiv HTML ekanligini aniqlash
-  const isHtmlTest = 
-    contentType === 'html_code' || 
-    contentUrl.endsWith('.html') || 
-    contentUrl.includes('html') ||
-    contentHtml.trim().startsWith('<!DOCTYPE') || 
-    contentHtml.trim().startsWith('<html');
+  // 📁 SUPABASE STORAGE'GA FAYL YUKLASh FUNKSIYASI
+  async function uploadToStorage(file: File, folder: string): Promise<string> {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    
+    // 'tests' nomli bucket'ga faylni yuklash
+    const { data, error } = await supabase.storage
+      .from('tests')
+      .upload(fileName, file, { cacheControl: '3600', upsert: true });
 
-  // Javob qo'shish funksiyasi (Faqat PDF testlar uchun)
-  function handleAddAnswer() {
-    if (!newAnswer.trim()) return;
-    setAnswers([...answers, newAnswer.trim().toUpperCase()]);
-    setNewAnswer('');
-  }
+    if (error) throw error;
 
-  // Javobni o'chirish
-  function handleRemoveAnswer(index: number) {
-    setAnswers(answers.filter((_, i) => i !== index));
+    // Yuklangan faylning ommaviy URL manzilini olish
+    const { data: publicUrlData } = supabase.storage
+      .from('tests')
+      .getPublicUrl(fileName);
+
+    return publicUrlData.publicUrl;
   }
 
   // 🚀 TESTNI BAZAGA SAQLASh
@@ -49,48 +49,78 @@ export default function TeacherTestManager() {
     setMessage(null);
 
     if (!title.trim()) {
-      setMessage({ status: 'error', text: 'Iltisons, test sarlavhasini kiriting!' });
+      setMessage({ status: 'error', text: 'Iltimos, test sarlavhasini kiriting!' });
       setUploading(false);
       return;
     }
 
-    // HTML test yoki PDF test ligiga qarab tekshiruv
-    if (!isHtmlTest) {
-      if ((type === 'reading' || type === 'listening') && answers.length === 0) {
-        setMessage({ status: 'error', text: 'PDF formatidagi testlar uchun Answer Key (Javoblar kaliti) kiritish majburiy!' });
-        setUploading(false);
-        return;
-      }
+    if (!testFile && type !== 'writing' && type !== 'speaking') {
+      setMessage({ status: 'error', text: 'Iltimos, asosiy test hujjatini (PDF) yuklang!' });
+      setUploading(false);
+      return;
     }
 
     try {
+      let finalContentUrl = '';
+      let finalImageUrl = '';
+      let urlAudio1 = '';
+      let urlAudio2 = '';
+      let urlAudio3 = '';
+      let urlAudio4 = '';
+
+      // 1. Asosiy test faylini yuklash (PDF)
+      if (testFile) {
+        finalContentUrl = await uploadToStorage(testFile, 'documents');
+      }
+
+      // 2. Agar Reading bo'lsa va rasm tanlangan bo'lsa yuklash
+      if (type === 'reading' && readingImage) {
+        finalImageUrl = await uploadToStorage(readingImage, 'images');
+      }
+
+      // 3. Agar Listening bo'lsa, har bir Section audiosini alohida yuklash
+      if (type === 'listening') {
+        if (audioSec1) urlAudio1 = await uploadToStorage(audioSec1, 'audio/section1');
+        if (audioSec2) urlAudio2 = await uploadToStorage(audioSec2, 'audio/section2');
+        if (audioSec3) urlAudio3 = await uploadToStorage(audioSec3, 'audio/section3');
+        if (audioSec4) urlAudio4 = await uploadToStorage(audioSec4, 'audio/section4');
+      }
+
+      // 4. Ma'lumotlarni bazaga (Jadvalga) yozish
       const payload = {
         title: title.trim(),
         type: type,
         scheduled_date: scheduledDate,
-        content_html: contentType === 'html_code' ? contentHtml : null,
-        content_url: contentType === 'pdf' ? contentUrl : null,
-        audio_url: type === 'listening' ? audioUrl : null,
-        // Agarda interaktiv HTML test bo'lsa, javoblar massivini bo'sh qoldiramiz
-        answer_key: isHtmlTest ? [] : answers,
-        content: contentType === 'html_code' ? contentHtml : (contentUrl || title)
+        content_url: finalContentUrl,
+        image_url: finalImageUrl || null,
+        // Har bir section audiosi alohida column'ga tushadi
+        audio_section1: urlAudio1 || null,
+        audio_section2: urlAudio2 || null,
+        audio_section3: urlAudio3 || null,
+        audio_section4: urlAudio4 || null,
+        // Eski kodlar bilan moslikni yo'qotmaslik uchun asosiy audio maydoniga 1-sectionni ulab qo'yamiz
+        audio_url: urlAudio1 || null, 
+        answer_key: [], // Interaktivlik brauzer yoki HTML tomonda hal bo'lishi uchun bo'sh massiv
+        content: title.trim()
       };
 
       const { error } = await supabase.from('tests').insert(payload);
-
       if (error) throw error;
 
-      setMessage({ status: 'success', text: 'Yangi test muvaffaqiyatli saqlandi va o\'quvchilarga taqdim etildi!' });
+      setMessage({ status: 'success', text: 'Fayllar Supabase Storage\'ga yuklandi va test muvaffaqiyatli yaratildi!' });
       
       // Formani tozalash
       setTitle('');
-      setContentHtml('');
-      setContentUrl('');
-      setAudioUrl('');
-      setAnswers([]);
+      setTestFile(null);
+      setReadingImage(null);
+      setAudioSec1(null);
+      setAudioSec2(null);
+      setAudioSec3(null);
+      setAudioSec4(null);
+
     } catch (err: any) {
       console.error(err);
-      setMessage({ status: 'error', text: err.message || 'Bazaga saqlashda xatolik yuz berdi.' });
+      setMessage({ status: 'error', text: err.message || 'Fayllarni yuklashda yoki saqlashda xatolik yuz berdi.' });
     } finally {
       setUploading(false);
     }
@@ -100,8 +130,8 @@ export default function TeacherTestManager() {
     <div className="max-w-2xl mx-auto p-6 bg-slate-900 border border-white/10 rounded-3xl text-white space-y-6 my-10 shadow-2xl">
       <div className="flex items-center justify-between border-b border-white/5 pb-4">
         <div className="flex items-center gap-3">
-          <Plus className="text-blue-500" />
-          <h2 className="text-xl font-bold tracking-tight">Yangi IELTS Test Yuklash (Teacher Panel)</h2>
+          <UploadCloud className="text-blue-500" />
+          <h2 className="text-xl font-bold tracking-tight">Direct File Upload Panel (Supabase Storage)</h2>
         </div>
         <button 
           type="button"
@@ -132,7 +162,7 @@ export default function TeacherTestManager() {
             value={title} 
             onChange={e => setTitle(e.target.value)}
             className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors" 
-            placeholder="Masalan: Cambridge 19 - Test 1 Reading"
+            placeholder="Masalan: Ultimate Practice Test - Volume 1"
           />
         </div>
 
@@ -163,123 +193,111 @@ export default function TeacherTestManager() {
           </div>
         </div>
 
-        {/* Kontent Turi (PDF yoki HTML Switcher) */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fayl Formati</label>
-          <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-xl border border-white/10">
-            <button 
-              type="button" 
-              onClick={() => setContentType('pdf')}
-              className={`py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${contentType === 'pdf' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-            >
-              <FileText size={14} /> Standart PDF hujjat
-            </button>
-            <button 
-              type="button" 
-              onClick={() => setContentType('html_code')}
-              className={`py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${contentType === 'html_code' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
-            >
-              <FileCode size={14} /> Interaktiv HTML fayl
-            </button>
-          </div>
-        </div>
-
-        {/* Kontent Kiritish Maydoni */}
-        {contentType === 'pdf' ? (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">PDF URL (Storage Public URL)</label>
-            <input 
-              type="text" 
-              value={contentUrl} 
-              onChange={e => setContentUrl(e.target.value)}
-              className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 font-mono" 
-              placeholder="https://your-supabase.supabase.co/storage/v1/object/public/..."
-            />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {/* JSX parsing xatosini bartaraf qilish uchun string inkapsulyatsiya qilindi */}
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              HTML To&apos;liq Kodi {"(<!DOCTYPE html>... bilan birga)"}
+        {/* ── MANA BU YERDA FAQAT FAYL YUKLASh ELEMENTLARI JOLAShGAN ── */}
+        
+        {/* 1. Asosiy Test Fayli (PDF yoki HTML) */}
+        {type !== 'writing' && type !== 'speaking' && (
+          <div className="flex flex-col gap-1.5 p-4 bg-slate-950 rounded-2xl border border-white/5">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <FileText size={14} className="text-blue-400" /> Asosiy Test Fayli (PDF yoki Interactive .html)
             </label>
-            <textarea 
-              rows={8}
-              value={contentHtml} 
-              onChange={e => setContentHtml(e.target.value)}
-              className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500 font-mono" 
-              placeholder={'<!DOCTYPE html>\n<html>\n<head>...</head>\n<body>...</body>\n</html>'}
-            />
-          </div>
-        )}
-
-        {/* Listening uchun Audio Track */}
-        {type === 'listening' && (
-          <div className="flex flex-col gap-1.5 bg-sky-950/20 p-4 rounded-xl border border-sky-500/10">
-            <label className="text-xs font-bold text-sky-400 uppercase tracking-wider">Audio Fayl URL (Agar HTML ichida audio bo&apos;lmasa)</label>
             <input 
-              type="text" 
-              value={audioUrl} 
-              onChange={e => setAudioUrl(e.target.value)}
-              className="bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500 font-mono" 
-              placeholder="https://.../audio.mp3"
+              type="file" 
+              accept=".pdf,.html"
+              onChange={e => setTestFile(e.target.files?.[0] || null)}
+              className="text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer cursor-pointer"
             />
+            {testFile && <p className="text-[11px] text-emerald-400 font-mono mt-1">Tanlandi: {testFile.name}</p>}
           </div>
         )}
 
-        {/* JAVOBLAR KALITI (HTML formatda avtomatik ravishda so'ralmaydi va yashiriladi) */}
-        {!isHtmlTest && (type === 'reading' || type === 'listening') ? (
-          <div className="p-4 bg-slate-950/40 rounded-2xl border border-white/5 space-y-3 shadow-inner">
-            <label className="text-xs font-bold text-blue-400 uppercase tracking-wider block">
-              Answer Key Sheet (PDF uchun majburiy)
+        {/* 2. Reading uchun rasm yuklash paneli */}
+        {type === 'reading' && (
+          <div className="flex flex-col gap-1.5 p-4 bg-slate-950 rounded-2xl border border-white/5">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Image size={14} className="text-emerald-400" /> Qo&apos;shimcha Rasm (Agar matnda xarita yoki diagramma bo&apos;lsa)
+            </label>
+            <input 
+              type="file" 
+              accept="image/*"
+              onChange={e => setReadingImage(e.target.files?.[0] || null)}
+              className="text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 file:cursor-pointer cursor-pointer"
+            />
+            {readingImage && <p className="text-[11px] text-emerald-400 font-mono mt-1">Tanlandi: {readingImage.name}</p>}
+          </div>
+        )}
+
+        {/* 3. Listening uchun Har bitta Section audio fayllari */}
+        {type === 'listening' && (
+          <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4">
+            <label className="text-xs font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-white/5 pb-2">
+              <Headphones size={14} /> Listening Section Audio Files
             </label>
             
-            <div className="flex gap-2">
+            {/* Section 1 */}
+            <div className="flex flex-col gap-1 bg-slate-900/50 p-2.5 rounded-xl border border-white/5">
+              <span className="text-[11px] font-bold text-slate-400">Section 1 Audio Track</span>
               <input 
-                type="text" 
-                value={newAnswer}
-                onChange={e => setNewAnswer(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddAnswer())}
-                className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white uppercase font-mono focus:outline-none focus:border-blue-500"
-                placeholder="Masalan: TRUE, B, NOT GIVEN, 35"
+                type="file" 
+                accept="audio/*"
+                onChange={e => setAudioSec1(e.target.files?.[0] || null)}
+                className="text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-sky-600 file:text-white hover:file:bg-sky-700 file:cursor-pointer cursor-pointer"
               />
-              <button 
-                type="button" 
-                onClick={handleAddAnswer}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              >
-                Qo&apos;shish
-              </button>
+              {audioSec1 && <p className="text-[10px] text-sky-400 font-mono">{audioSec1.name}</p>}
             </div>
 
-            {/* Kiritilgan javoblar listi */}
-            {answers.length > 0 && (
-              <div className="grid grid-cols-4 gap-2 pt-2 max-h-32 overflow-y-auto">
-                {answers.map((ans, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-slate-900 border border-white/5 px-2 py-1 rounded-lg text-xs font-mono">
-                    <span><strong className="text-slate-500">{idx + 1}.</strong> {ans}</span>
-                    <button type="button" onClick={() => handleRemoveAnswer(idx)} className="text-rose-500 hover:text-rose-400 ml-1 cursor-pointer">
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Section 2 */}
+            <div className="flex flex-col gap-1 bg-slate-900/50 p-2.5 rounded-xl border border-white/5">
+              <span className="text-[11px] font-bold text-slate-400">Section 2 Audio Track</span>
+              <input 
+                type="file" 
+                accept="audio/*"
+                onChange={e => setAudioSec2(e.target.files?.[0] || null)}
+                className="text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-sky-600 file:text-white hover:file:bg-sky-700 file:cursor-pointer cursor-pointer"
+              />
+              {audioSec2 && <p className="text-[10px] text-sky-400 font-mono">{audioSec2.name}</p>}
+            </div>
+
+            {/* Section 3 */}
+            <div className="flex flex-col gap-1 bg-slate-900/50 p-2.5 rounded-xl border border-white/5">
+              <span className="text-[11px] font-bold text-slate-400">Section 3 Audio Track</span>
+              <input 
+                type="file" 
+                accept="audio/*"
+                onChange={e => setAudioSec3(e.target.files?.[0] || null)}
+                className="text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-sky-600 file:text-white hover:file:bg-sky-700 file:cursor-pointer cursor-pointer"
+              />
+              {audioSec3 && <p className="text-[10px] text-sky-400 font-mono">{audioSec3.name}</p>}
+            </div>
+
+            {/* Section 4 */}
+            <div className="flex flex-col gap-1 bg-slate-900/50 p-2.5 rounded-xl border border-white/5">
+              <span className="text-[11px] font-bold text-slate-400">Section 4 Audio Track</span>
+              <input 
+                type="file" 
+                accept="audio/*"
+                onChange={e => setAudioSec4(e.target.files?.[0] || null)}
+                className="text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-sky-600 file:text-white hover:file:bg-sky-700 file:cursor-pointer cursor-pointer"
+              />
+              {audioSec4 && <p className="text-[10px] text-sky-400 font-mono">{audioSec4.name}</p>}
+            </div>
           </div>
-        ) : isHtmlTest && (type === 'reading' || type === 'listening') ? (
-          <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
-            <p className="text-xs text-emerald-400/90 italic flex items-center gap-1.5">
-              ✨ Interaktiv HTML format tanlandi. Ushbu fayl ichida o&apos;zining JavaScript tekshiruv tizimi va audiosi mavjudligi sababli, tashqi javoblar varaqasi (Answer Key) kiritish talab qilinmaydi.
-            </p>
-          </div>
-        ) : null}
+        )}
 
         {/* Submit Button */}
         <button 
           type="submit" 
           disabled={uploading}
-          className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-blue-600/10 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-blue-600/10 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
         >
-          {uploading ? "Saqlanmoqda..." : "Testni Yakunlash va Yuklash"}
+          {uploading ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              Fayllar Supabase Storage&apos;ga yuklanmoqda...
+            </>
+          ) : (
+            "Testni Avtomatik Yuklash va Saqlash"
+          )}
         </button>
       </form>
     </div>
