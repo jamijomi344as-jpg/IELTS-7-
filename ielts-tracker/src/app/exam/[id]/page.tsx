@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import type { Test, ExamMode } from '@/types';
-import { ReadingListeningInterface } from '@/components/ReadingListeningInterface';
+import  ReadingListeningInterface  from '@/components/ReadingListeningInterface';
 import { WritingInterface } from '@/components/WritingInterface';
 import { SpeakingSimulator } from '@/components/SpeakingSimulator';
 
