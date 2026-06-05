@@ -33,7 +33,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const isExam      = mode === 'exam';
 
   // 🔥 1. HTML EKANLIGINI TEKSHIRISHNI KUChAYTIRAMIZ (Barcha maydonlarni tekshiradi)
-  const rawContent = (test.content_html || test.content || '').trim();
+const rawContent = (test.content_html || (test as any).content || '').trim();
   const isHtmlFile = 
     (test.content_url && (test.content_url.endsWith('.html') || test.content_url.includes('html'))) ||
     rawContent.startsWith('<!DOCTYPE') || 
