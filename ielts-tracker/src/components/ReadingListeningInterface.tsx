@@ -148,13 +148,13 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const totalQ   = test.answer_key?.length || 40;
   const answered = Object.values(answers).filter(v => v.trim()).length;
 
-  // ── TUZATILGAN QISM: HTML VA PDF ULTRA DINAMIK RENDERER ──────────────────────────
+  // ── HTML VA PDF ULTRA DINAMIK RENDERER ──────────────────────────
   function renderContent() {
     if (test.content_url) {
       const isPdf = test.content_url.endsWith('.pdf') || test.content_url.includes('pdf');
       const isHtml = test.content_url.endsWith('.html') || test.content_url.includes('html');
 
-      // Agar yuklangan fayl HTML bo'lsa (Iframe orqali mukammal render)
+      // Agar yuklangan fayl HTML bo'lsa
       if (isHtml) {
         return (
           <div className="w-full h-full min-h-[75vh] bg-white rounded-xl overflow-hidden border border-white/10">
@@ -168,7 +168,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
         );
       }
 
-      // Agar yuklangan fayl PDF bo'lsa (Eng xavfsiz iframe ko'rinishida)
+      // Agar yuklangan fayl PDF bo'lsa
       if (isPdf) {
         return (
           <div className="w-full h-full min-h-[75vh] bg-slate-800 rounded-xl overflow-hidden border border-white/10">
@@ -182,7 +182,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
       }
     }
     
-    // Agar fayl linki emas, Supabase Rich Text orqali yozilgan HTML kod bo'lsa
+    // Agar fayl linki emas, Supabase Rich Text orqali yozilgan HTML matn bo'lsa
     if (test.content_html) {
       return (
         <div
@@ -349,15 +349,15 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
 
         {/* ── SAVOLLAR INTEGRATSIYASI ────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {/* Agar Supabase bazasida savollarning o'zi HTML matn sifatida berilgan bo'lsa (Masalan: test.questions_html) */}
-          {test.questions_html && (
+          {/* TypeScript xatosi batamom hal qilingan qism: (test as any) */}
+          {(test as any).questions_html && (
             <div 
               className="prose prose-invert prose-sm max-w-none text-slate-300 bg-slate-950 p-5 rounded-2xl border border-white/5 mb-4 leading-relaxed dynamic-html-questions selection:bg-blue-500/30"
-              dangerouslySetInnerHTML={{ __html: test.questions_html }}
+              dangerouslySetInnerHTML={{ __html: (test as any).questions_html }}
             />
           )}
 
-          {/* Har qanday holatda talaba bemalol javob kiritishi uchun raqamlangan toza input paneli */}
+          {/* Doimiy va qulay javob kiritish katakchalari */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
               <HelpCircle size={13} className="text-blue-400" /> Enter Your Final Answers Here:
@@ -392,7 +392,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
         </div>
       </div>
 
-      {/* ── Natija Modali (To'liq saqlandi) ──────────────────────────────────────── */}
+      {/* ── Natija Modali ──────────────────────────────────────── */}
       {showResult && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <motion.div
