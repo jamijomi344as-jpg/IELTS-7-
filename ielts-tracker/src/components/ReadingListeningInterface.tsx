@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   BookOpen, Headphones, AlertCircle, CheckCircle2,
-  Pause, Play, Volume2, VolumeX, RotateCcw, Clock,
+  Pause, Play, Volume2, VolumeX, RotateCcw, Clock, HelpCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getBand } from '@/types';
@@ -20,7 +20,6 @@ interface Props {
 const TIMER_READING  = 60 * 60;  // 60 minutes
 const TIMER_LISTENING = 30 * 60; // 30 minutes
 
-// Audio vaqtini formatlash uchun yordamchi funksiya (Fayl tepasiga ko'chirildi)
 function formatAudioTime(s: number) {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
@@ -67,7 +66,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     setAnswers(prev => ({ ...prev, [String(n)]: val }));
   }
 
-  // ── Audio boshqaruvi (Faqat Exercise rejimida ishlaydi) ─────────────────────────
+  // ── Audio boshqaruvi ─────────────────────────────────────────────────
   function toggleAudio() {
     const a = audioRef.current;
     if (!a || isExam) return; 
@@ -95,7 +94,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     setAudioPaused(false);
   }
 
-  // ── Testni yakunlash va natijalarni yuborish ─────────────────────────────
+  // ── Testni yakunlash va Natijalarni yuborish ─────────────────────────────
   const handleSubmit = useCallback(async () => {
     if (submitting || showResult) return;
     setSubmitting(true);
@@ -107,7 +106,6 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     const key = test.answer_key ?? [];
     let correct = 0;
     
-    // Javoblarni tekshirish mantiqi
     key.forEach((ans, i) => {
       if ((answers[String(i + 1)] ?? '').trim().toLowerCase() === ans.trim().toLowerCase()) {
         correct++;
@@ -115,8 +113,6 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     });
     
     const total = key.length || 40;
-    
-    // IELTS Band hisoblagichni chaqiramiz
     const bandResult = getBand(correct, test.type as 'reading' | 'listening');
     const stringBand = typeof bandResult === 'number' ? bandResult.toFixed(1) : String(bandResult);
 
@@ -137,13 +133,12 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
       console.error("Submissions saving error:", err);
     }
 
-    localStorage.removeItem(STORAGE_KEY); // Saqlangan qoralamani tozalash
+    localStorage.removeItem(STORAGE_KEY);
     setScore({ raw: correct, band: stringBand });
     setShowResult(true);
     setSubmitting(false);
   }, [answers, submitting, showResult, test, studentName, mode, STORAGE_KEY, isActive, pause]);
 
-  // ── Exam rejimida vaqt tugasa avtomatik topshirib yuborish ─────────────────
   useEffect(() => {
     if (timeLeft === 0 && isExam && !showResult) {
       handleSubmit();
@@ -153,53 +148,66 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const totalQ   = test.answer_key?.length || 40;
   const answered = Object.values(answers).filter(v => v.trim()).length;
 
-  // ── Passage kontentini vizual ko'rsatish funksiyasi ─────────────────────────────
+  // ── TUZATILGAN QISM: HTML VA PDF ULTRA DINAMIK RENDERER ──────────────────────────
   function renderContent() {
     if (test.content_url) {
       const isPdf = test.content_url.endsWith('.pdf') || test.content_url.includes('pdf');
+      const isHtml = test.content_url.endsWith('.html') || test.content_url.includes('html');
+
+      // Agar yuklangan fayl HTML bo'lsa (Iframe orqali mukammal render)
+      if (isHtml) {
+        return (
+          <div className="w-full h-full min-h-[75vh] bg-white rounded-xl overflow-hidden border border-white/10">
+            <iframe 
+              src={test.content_url} 
+              className="w-full h-full border-none"
+              title="IELTS Reading HTML Content"
+              sandbox="allow-scripts allow-same-origin"
+            />
+          </div>
+        );
+      }
+
+      // Agar yuklangan fayl PDF bo'lsa (Eng xavfsiz iframe ko'rinishida)
       if (isPdf) {
         return (
-          <object
-            data={test.content_url}
-            type="application/pdf"
-            className="w-full h-full rounded-xl min-h-[75vh]"
-            aria-label="PDF passage"
-          >
-            <div className="p-4 bg-slate-900 border border-white/10 rounded-xl text-center">
-              <p className="text-sm text-slate-400 mb-2">PDF reader could not be rendered natively in this browser.</p>
-              <a href={test.content_url} target="_blank" rel="noreferrer"
-                 className="text-blue-400 hover:underline text-sm font-bold">
-                Open PDF in new tab ↗
-              </a>
-            </div>
-          </object>
+          <div className="w-full h-full min-h-[75vh] bg-slate-800 rounded-xl overflow-hidden border border-white/10">
+            <iframe
+              src={`${test.content_url}#toolbar=0&navpanes=0`}
+              className="w-full h-full border-none"
+              title="IELTS Reading PDF Content"
+            />
+          </div>
         );
       }
     }
     
+    // Agar fayl linki emas, Supabase Rich Text orqali yozilgan HTML kod bo'lsa
     if (test.content_html) {
       return (
         <div
-          className="prose prose-invert prose-sm max-w-none leading-relaxed text-slate-300"
+          className="prose prose-invert prose-sm max-w-none leading-relaxed text-slate-300 bg-slate-900/20 p-4 rounded-xl border border-white/5 font-serif selection:bg-blue-500/30 overflow-y-auto"
           dangerouslySetInnerHTML={{ __html: test.content_html }}
         />
       );
     }
     
-    return <p className="text-slate-500 text-sm">No test content or passage uploaded.</p>;
+    return (
+      <div className="p-6 bg-slate-900/40 border border-white/5 rounded-xl text-center flex flex-col items-center justify-center min-h-[40vh]">
+        <AlertCircle className="text-slate-500 mb-2" size={24} />
+        <p className="text-sm text-slate-400 italic">No test content, HTML, or PDF passage uploaded.</p>
+      </div>
+    );
   }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 min-h-screen bg-[#020817] text-white">
       {/* ── CHAP TOMON: Passage yoki Audio bo'limi ─────────────────────────────── */}
       <div className="overflow-y-auto flex flex-col border-r border-white/10 h-screen">
-        {/* Sub-header bar */}
         <div className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
-              {isListening
-                ? <Headphones size={15} className="text-sky-400" />
-                : <BookOpen   size={15} className="text-emerald-400" />}
+              {isListening ? <Headphones size={15} className="text-sky-400" /> : <BookOpen size={15} className="text-emerald-400" />}
             </div>
             <div>
               <p className="font-bold text-sm text-white">{test.title}</p>
@@ -213,7 +221,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
             {!isExam && (
               <button 
                 onClick={isActive ? pause : start}
-                className="ml-1 p-1 hover:bg-white/10 rounded transition-colors text-slate-400"
+                className="ml-1 p-1 hover:bg-white/10 rounded transition-colors text-slate-400 cursor-pointer"
               >
                 {isActive ? <Pause size={13}/> : <Play size={13}/>}
               </button>
@@ -222,7 +230,6 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
         </div>
 
         <div className="flex-1 p-6 space-y-5">
-          {/* Listening Tizimi uchun Audio pleyer interfeysi */}
           {isListening && (
             <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 p-5 space-y-4">
               <div className="flex items-center justify-between">
@@ -253,10 +260,8 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
                     <button
                       onClick={audioPaused ? startAudio : toggleAudio}
                       disabled={isExam && !audioPaused}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                        audioPaused
-                          ? 'bg-sky-600 hover:bg-sky-500 text-white'
-                          : 'bg-white/10 hover:bg-white/20 text-white'
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                        audioPaused ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'
                       }`}
                     >
                       {audioPaused ? <Play size={16} className="ml-0.5"/> : <Pause size={16}/>}
@@ -281,7 +286,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
                     {!isExam && (
                       <button 
                         onClick={() => setMuted(v => !v)}
-                        className="text-slate-400 hover:text-white transition-colors"
+                        className="text-slate-400 hover:text-white transition-colors cursor-pointer"
                       >
                         {muted ? <VolumeX size={15}/> : <Volume2 size={15}/>}
                       </button>
@@ -294,7 +299,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
                             audioRef.current.currentTime = Math.max(0, audioTime - 10); 
                           }
                         }}
-                        className="text-slate-400 hover:text-white transition-colors" 
+                        className="text-slate-400 hover:text-white transition-colors cursor-pointer" 
                         title="Back 10s"
                       >
                         <RotateCcw size={14}/>
@@ -304,26 +309,24 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
                 </div>
               )}
 
-              {/* Tashqaridan embed qilingan iframe audiolari uchun */}
               {test.has_embedded_audio && test.content_html && (
                 <div dangerouslySetInnerHTML={{ __html: test.content_html }} />
               )}
             </div>
           )}
 
-          {/* Matnli yoki PDF ko'rinishidagi test kontenti */}
           <div className="h-full">
             {renderContent()}
           </div>
         </div>
       </div>
 
-      {/* ── O'NG TOMON: Answer Sheet (Javoblar varaqasi) ───────────────────────────────── */}
+      {/* ── O'NG TOMON: Dynamic Questions Form & Answer Sheet ─────────────────────────── */}
       <div className="flex flex-col bg-[#0f172a] border-l border-white/10 h-screen">
         <div className="p-4 border-b border-white/10 flex items-center justify-between bg-slate-900/40">
           <div className="flex items-center gap-2">
             <AlertCircle size={15} className="text-blue-400" />
-            <span className="font-bold text-sm">Answer Sheet</span>
+            <span className="font-bold text-sm">Questions & Answer Sheet</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400 font-mono">{answered}/{totalQ}</span>
@@ -337,7 +340,6 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
           </div>
         </div>
 
-        {/* To'ldirilish progress bar */}
         <div className="h-1 bg-white/5">
           <div 
             className="h-full bg-blue-500 transition-all duration-300" 
@@ -345,22 +347,38 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
           />
         </div>
 
-        {/* Input Javob maydonlari */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {Array.from({ length: totalQ }, (_, i) => i + 1).map(n => (
-            <div key={n} className="flex items-center gap-2.5">
-              <span className="w-7 text-right text-xs text-slate-400 font-mono shrink-0">{n}</span>
-              <input
-                type="text"
-                value={answers[String(n)] ?? ''}
-                onChange={e => setAnswer(n, e.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 text-white uppercase placeholder:text-white/10 font-medium"
-                placeholder="Type answer..."
-              />
+        {/* ── SAVOLLAR INTEGRATSIYASI ────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {/* Agar Supabase bazasida savollarning o'zi HTML matn sifatida berilgan bo'lsa (Masalan: test.questions_html) */}
+          {test.questions_html && (
+            <div 
+              className="prose prose-invert prose-sm max-w-none text-slate-300 bg-slate-950 p-5 rounded-2xl border border-white/5 mb-4 leading-relaxed dynamic-html-questions selection:bg-blue-500/30"
+              dangerouslySetInnerHTML={{ __html: test.questions_html }}
+            />
+          )}
+
+          {/* Har qanday holatda talaba bemalol javob kiritishi uchun raqamlangan toza input paneli */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
+              <HelpCircle size={13} className="text-blue-400" /> Enter Your Final Answers Here:
+            </h3>
+            <div className="grid grid-cols-1 gap-2">
+              {Array.from({ length: totalQ }, (_, i) => i + 1).map(n => (
+                <div key={n} className="flex items-center gap-2.5 bg-slate-900/30 p-2 rounded-xl border border-white/5 hover:border-white/10 transition-colors">
+                  <span className="w-7 text-right text-xs text-slate-400 font-mono shrink-0 font-bold">{n}.</span>
+                  <input
+                    type="text"
+                    value={answers[String(n)] ?? ''}
+                    onChange={e => setAnswer(n, e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="flex-1 bg-slate-950 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 text-white uppercase placeholder:text-slate-700 font-mono font-bold"
+                    placeholder={`Write answer for number ${n}...`}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
 
         <div className="p-4 border-t border-white/10 bg-slate-900/20">
@@ -374,7 +392,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
         </div>
       </div>
 
-      {/* ── Test Tugaganda Chiqadigan Natija Modali ──────────────────────────────────────── */}
+      {/* ── Natija Modali (To'liq saqlandi) ──────────────────────────────────────── */}
       {showResult && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <motion.div
