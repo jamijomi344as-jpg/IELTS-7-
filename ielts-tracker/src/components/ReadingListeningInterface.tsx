@@ -32,10 +32,14 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const isListening = test.type === 'listening';
   const isExam      = mode === 'exam';
 
-  // 🌍 HTML fayl ekanligini aniqlash mantiqi
+  // 🔥 1. HTML EKANLIGINI TEKSHIRISHNI KUChAYTIRAMIZ (Barcha maydonlarni tekshiradi)
+  const rawContent = (test.content_html || test.content || '').trim();
   const isHtmlFile = 
     (test.content_url && (test.content_url.endsWith('.html') || test.content_url.includes('html'))) ||
-    (test.content_html && (test.content_html.trim().startsWith('<!DOCTYPE') || test.content_html?.trim().startsWith('<html')));
+    rawContent.startsWith('<!DOCTYPE') || 
+    rawContent.startsWith('<html') ||
+    rawContent.includes('<html') || 
+    rawContent.includes('<!DOCTYPE html>');
 
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {};
@@ -97,7 +101,6 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     setAudioPaused(false);
   }
 
-  // 🚀 TEST TOPSHIRISH METODI
   const handleSubmit = useCallback(async () => {
     if (submitting || showResult || isHtmlFile) return;
     setSubmitting(true);
@@ -151,17 +154,18 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const totalQ   = test.answer_key?.length || 40;
   const answered = Object.values(answers).filter(v => v.trim()).length;
 
-  // ── 1️⃣ INTERAKTIV HTML REJIMI (BUTUN EKRANDA REKLAMASIZ VA PANELSIZ OChILADI) ──
+  // ── 🌍 2. INTERAKTIV HTML REJIMI (KOD STRINGINI VIZUAL EKANGA O'TKAZISh) ──
   if (isHtmlFile) {
-    const htmlSrc = test.content_url || (test.content_html ? `data:text/html;charset=utf-8,${encodeURIComponent(test.content_html)}` : '');
+    // Agar kod text sifatida kelayotgan bo'lsa, uni xavfsiz iframe source-ga o'giramiz
+    const htmlSrc = test.content_url || `data:text/html;charset=utf-8,${encodeURIComponent(rawContent)}`;
 
     return (
       <div className="w-screen h-screen bg-slate-950 flex flex-col overflow-hidden select-none">
         {/* Yuqori boshqaruv paneli */}
         <div className="bg-slate-900 border-b border-white/10 px-6 py-3 flex items-center justify-between z-10 shadow-lg">
           <div className="flex items-center gap-3">
-            <span className="px-2.5 py-1 bg-gradient-to-r from-sky-500 to-blue-600 text-white text-xs font-black rounded-md border border-sky-400/30 uppercase tracking-wider animate-pulse">
-              Interactive HTML Test
+            <span className="px-2.5 py-1 bg-gradient-to-r from-sky-500 to-blue-600 text-white text-xs font-black rounded-md border border-sky-400/30 uppercase tracking-wider">
+              Interactive Exam Mode
             </span>
             <h1 className="font-bold text-sm text-white tracking-wide">{test.title}</h1>
           </div>
@@ -173,7 +177,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
           </button>
         </div>
         
-        {/* HTML iframe to'liq ekran kengligida */}
+        {/* HTML iframe — barcha scriptlari bilan to'liq vizual holatda ishlaydi */}
         <div className="flex-1 w-full h-full bg-white relative">
           <iframe 
             src={htmlSrc}
@@ -187,7 +191,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     );
   }
 
-  // ── 2️⃣ NATIJALAR EKRANI (PDF TESTLAR TUGAGANDA ChIQADIGAN ChIROYLI INTERFEYS) ──
+  // ── 3️⃣ NATIJALAR EKRANI (PDF TESTLAR TUGAGANDA ChIQADIGAN INTERFEYS) ──
   if (showResult) {
     return (
       <div className="min-h-screen bg-[#020817] flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950">
@@ -237,10 +241,10 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     );
   }
 
-  // ── 3️⃣ STANDART REJIM (PDF TESTLAR UChUN EKRAN IKKIGA BO'LINGAN INTERFEYS) ──
+  // ── 4️⃣ STANDART REJIM (PDF TESTLAR UChUN INTERFEYS) ──
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 min-h-screen bg-[#020817] text-white">
-      {/* CHAP TOMON: Kontent paneli */}
+      {/* CHAP TOMON */}
       <div className="overflow-y-auto flex flex-col border-r border-white/10 h-screen">
         <div className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -268,7 +272,6 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
         </div>
 
         <div className="flex-1 p-6 space-y-5">
-          {/* Audio pleyer (Faqat listening test va embedded audio bo'lmaganda chiqadi) */}
           {isListening && !test.has_embedded_audio && test.audio_url && (
             <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 p-5 space-y-4 shadow-xl">
               <div className="flex items-center justify-between">
@@ -313,18 +316,17 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
             </div>
           )}
 
-          {/* Asosiy PDF hujjat hujjati */}
           <div className="h-full min-h-[75vh] bg-slate-800 rounded-xl overflow-hidden border border-white/10 shadow-inner">
             {test.content_url ? (
               <iframe src={`${test.content_url}#toolbar=0&navpanes=0`} className="w-full h-full border-none" title="PDF Content" />
             ) : (
-              <div className="prose prose-invert prose-sm p-4" dangerouslySetInnerHTML={{ __html: test.content_html || '' }} />
+              <div className="prose prose-invert prose-sm p-4" dangerouslySetInnerHTML={{ __html: test.content_html || test.content || '' }} />
             )}
           </div>
         </div>
       </div>
 
-      {/* O'NG TOMON: Javoblar varaqasi (Answer Sheet) */}
+      {/* O'NG TOMON */}
       <div className="flex flex-col bg-[#0f172a] border-l border-white/10 h-screen">
         <div className="p-4 border-b border-white/10 flex items-center justify-between bg-slate-900/40">
           <div className="flex items-center gap-2">
@@ -364,7 +366,6 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
           </div>
         </div>
 
-        {/* Testni yakunlash tugmasi */}
         <div className="p-4 border-t border-white/10 bg-slate-900/20 backdrop-blur-md">
           <button 
             onClick={handleSubmit} 
