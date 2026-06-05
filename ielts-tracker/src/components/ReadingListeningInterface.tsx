@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -10,39 +11,54 @@ import { getBand } from '@/types';
 import type { Test, ExamMode } from '@/types';
 import { useCountdown } from '@/hooks/useCountdown';
 
-interface Props { test: Test; studentName: string; mode: ExamMode; }
+interface Props { 
+  test: Test; 
+  studentName: string; 
+  mode: ExamMode; 
+}
 
 const TIMER_READING  = 60 * 60;  // 60 minutes
 const TIMER_LISTENING = 30 * 60; // 30 minutes
 
-export function ReadingListeningInterface({ test, studentName, mode }: Props) {
+// Audio vaqtini formatlash uchun yordamchi funksiya (Fayl tepasiga ko'chirildi)
+function formatAudioTime(s: number) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+export default function ReadingListeningInterface({ test, studentName, mode }: Props) {
   const STORAGE_KEY = `exam_answers_${test.id}`;
   const isListening = test.type === 'listening';
   const isExam      = mode === 'exam';
 
-  // ── Restore answers from localStorage ─────────────────────────
+  // ── LocalStorage-dan eski javoblarni tiklash ─────────────────────────
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     if (typeof window === 'undefined') return {};
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}'); } catch { return {}; }
+    try { 
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}'); 
+    } catch { 
+      return {}; 
+    }
   });
 
   const [showResult, setShowResult] = useState(false);
-  const [score, setScore]           = useState({ raw: 0, band: 0 });
+  const [score, setScore]           = useState({ raw: 0, band: '0.0' });
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Timer ──────────────────────────────────────────────────────
+  // ── Taymer sozlamalari ──────────────────────────────────────────────
   const initSecs = isListening ? TIMER_LISTENING : TIMER_READING;
   const { timeLeft, formattedTime, isActive, start, pause } = useCountdown(initSecs, true);
-  const timerColor = timeLeft < 300 ? 'text-accent' : timeLeft < 600 ? 'text-amber-400' : 'text-primary';
+  const timerColor = timeLeft < 300 ? 'text-rose-500' : timeLeft < 600 ? 'text-amber-400' : 'text-blue-400';
 
-  // ── Audio state ────────────────────────────────────────────────
+  // ── Audio holatlari ────────────────────────────────────────────────
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioPaused, setAudioPaused] = useState(true);
   const [audioTime, setAudioTime]     = useState(0);
   const [audioDur, setAudioDur]       = useState(0);
   const [muted, setMuted]             = useState(false);
 
-  // ── Save answers to localStorage on every change ───────────────
+  // ── Har safar javob o'zgarganda LocalStorage-ga avto-saqlash ───────────────
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
   }, [answers, STORAGE_KEY]);
@@ -51,13 +67,17 @@ export function ReadingListeningInterface({ test, studentName, mode }: Props) {
     setAnswers(prev => ({ ...prev, [String(n)]: val }));
   }
 
-  // ── Audio controls ─────────────────────────────────────────────
+  // ── Audio boshqaruvi (Faqat Exercise rejimida ishlaydi) ─────────────────────────
   function toggleAudio() {
     const a = audioRef.current;
-    if (!a) return;
-    if (isExam) return; // locked in exam mode
-    if (a.paused) { a.play(); setAudioPaused(false); }
-    else          { a.pause(); setAudioPaused(true); }
+    if (!a || isExam) return; 
+    if (a.paused) { 
+      a.play().catch(err => console.log("Audio play error:", err)); 
+      setAudioPaused(false); 
+    } else { 
+      a.pause(); 
+      setAudioPaused(true); 
+    }
   }
 
   function seek(val: number) {
@@ -71,82 +91,110 @@ export function ReadingListeningInterface({ test, studentName, mode }: Props) {
   function startAudio() {
     const a = audioRef.current;
     if (!a) return;
-    a.play();
+    a.play().catch(err => console.log("Audio play error:", err));
     setAudioPaused(false);
   }
 
-  // ── Submit ─────────────────────────────────────────────────────
+  // ── Testni yakunlash va natijalarni yuborish ─────────────────────────────
   const handleSubmit = useCallback(async () => {
     if (submitting || showResult) return;
     setSubmitting(true);
-    if (isExam || !isActive) {} else pause();
+    
+    if (!isExam && isActive) {
+      pause();
+    }
 
-    const key     = test.answer_key ?? [];
-    let correct   = 0;
+    const key = test.answer_key ?? [];
+    let correct = 0;
+    
+    // Javoblarni tekshirish mantiqi
     key.forEach((ans, i) => {
-      if ((answers[String(i + 1)] ?? '').trim().toLowerCase() === ans.trim().toLowerCase()) correct++;
+      if ((answers[String(i + 1)] ?? '').trim().toLowerCase() === ans.trim().toLowerCase()) {
+        correct++;
+      }
     });
+    
     const total = key.length || 40;
-    const band  = getBand(correct, test.type as 'reading' | 'listening');
+    
+    // IELTS Band hisoblagichni chaqiramiz
+    const bandResult = getBand(correct, test.type as 'reading' | 'listening');
+    const stringBand = typeof bandResult === 'number' ? bandResult.toFixed(1) : String(bandResult);
 
-    await supabase.from('student_submissions').insert({
-      student_name:   studentName,
-      test_id:        test.id,
-      test_type:      test.type,
-      test_title:     test.title,
-      exam_mode:      mode,
-      submitted_at:   new Date().toISOString(),
-      student_answers: answers,
-      score_raw:      correct,
-      score_band:     band,
-      score_summary:  `${correct}/${total} — Band ${band}`,
-    });
+    try {
+      await supabase.from('student_submissions').insert({
+        student_name:   studentName,
+        test_id:        test.id,
+        test_type:      test.type,
+        test_title:     test.title,
+        exam_mode:      mode,
+        submitted_at:   new Date().toISOString(),
+        student_answers: answers,
+        score_raw:      correct,
+        score_band:     stringBand,
+        score_summary:  `${correct}/${total} — Band ${stringBand}`,
+      });
+    } catch (err) {
+      console.error("Submissions saving error:", err);
+    }
 
-    localStorage.removeItem(STORAGE_KEY); // clear saved draft
-    setScore({ raw: correct, band });
+    localStorage.removeItem(STORAGE_KEY); // Saqlangan qoralamani tozalash
+    setScore({ raw: correct, band: stringBand });
     setShowResult(true);
     setSubmitting(false);
-  }, [answers, submitting, showResult, test, studentName, mode, STORAGE_KEY]);
+  }, [answers, submitting, showResult, test, studentName, mode, STORAGE_KEY, isActive, pause]);
 
-  // ── Auto-submit when timer hits 0 in exam mode ─────────────────
+  // ── Exam rejimida vaqt tugasa avtomatik topshirib yuborish ─────────────────
   useEffect(() => {
-    if (timeLeft === 0 && isExam && !showResult) handleSubmit();
-  }, [timeLeft]);
+    if (timeLeft === 0 && isExam && !showResult) {
+      handleSubmit();
+    }
+  }, [timeLeft, isExam, showResult, handleSubmit]);
 
   const totalQ   = test.answer_key?.length || 40;
   const answered = Object.values(answers).filter(v => v.trim()).length;
 
-  // ── Render passage/content ─────────────────────────────────────
+  // ── Passage kontentini vizual ko'rsatish funksiyasi ─────────────────────────────
   function renderContent() {
     if (test.content_url) {
       const isPdf = test.content_url.endsWith('.pdf') || test.content_url.includes('pdf');
-      if (isPdf) return (
-        <object
-          data={test.content_url}
-          type="application/pdf"
-          className="w-full h-full rounded-xl"
-          aria-label="PDF passage"
-        >
-          <a href={test.content_url} target="_blank" rel="noreferrer"
-            className="text-primary underline text-sm">Open PDF ↗</a>
-        </object>
+      if (isPdf) {
+        return (
+          <object
+            data={test.content_url}
+            type="application/pdf"
+            className="w-full h-full rounded-xl min-h-[75vh]"
+            aria-label="PDF passage"
+          >
+            <div className="p-4 bg-slate-900 border border-white/10 rounded-xl text-center">
+              <p className="text-sm text-slate-400 mb-2">PDF reader could not be rendered natively in this browser.</p>
+              <a href={test.content_url} target="_blank" rel="noreferrer"
+                 className="text-blue-400 hover:underline text-sm font-bold">
+                Open PDF in new tab ↗
+              </a>
+            </div>
+          </object>
+        );
+      }
+    }
+    
+    if (test.content_html) {
+      return (
+        <div
+          className="prose prose-invert prose-sm max-w-none leading-relaxed text-slate-300"
+          dangerouslySetInnerHTML={{ __html: test.content_html }}
+        />
       );
     }
-    if (test.content_html) return (
-      <div
-        className="prose prose-invert prose-sm max-w-none leading-relaxed text-white/80"
-        dangerouslySetInnerHTML={{ __html: test.content_html }}
-      />
-    );
-    return <p className="text-muted text-sm">No passage content uploaded.</p>;
+    
+    return <p className="text-slate-500 text-sm">No test content or passage uploaded.</p>;
   }
 
   return (
-    <div className="exam-split bg-[#020817]">
-      {/* ── LEFT: Passage / Audio ─────────────────────────────── */}
-      <div className="overflow-y-auto flex flex-col border-r border-white/8">
-        {/* Sub-header */}
-        <div className="sticky top-0 z-10 glass border-b border-white/8 px-6 py-3 flex items-center justify-between">
+    <div className="grid grid-cols-1 md:grid-cols-2 min-h-screen bg-[#020817] text-white">
+      {/* ── CHAP TOMON: Passage yoki Audio bo'limi ─────────────────────────────── */}
+      <div className="overflow-y-auto flex flex-col border-r border-white/10 h-screen">
+        {/* Sub-header bar */}
+        <div className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
               {isListening
@@ -154,16 +202,19 @@ export function ReadingListeningInterface({ test, studentName, mode }: Props) {
                 : <BookOpen   size={15} className="text-emerald-400" />}
             </div>
             <div>
-              <p className="font-bold text-sm">{test.title}</p>
-              <p className="text-xs text-muted capitalize">{mode} mode</p>
+              <p className="font-bold text-sm text-white">{test.title}</p>
+              <p className="text-xs text-slate-400 capitalize">{mode} mode</p>
             </div>
           </div>
+          
           <div className={`flex items-center gap-1.5 font-mono text-base font-bold ${timerColor}`}>
             <Clock size={14} />
             {formattedTime}
             {!isExam && (
-              <button onClick={isActive ? pause : start}
-                className="ml-1 p-1 hover:bg-white/10 rounded transition-colors text-muted">
+              <button 
+                onClick={isActive ? pause : start}
+                className="ml-1 p-1 hover:bg-white/10 rounded transition-colors text-slate-400"
+              >
                 {isActive ? <Pause size={13}/> : <Play size={13}/>}
               </button>
             )}
@@ -171,16 +222,16 @@ export function ReadingListeningInterface({ test, studentName, mode }: Props) {
         </div>
 
         <div className="flex-1 p-6 space-y-5">
-          {/* Listening audio engine */}
+          {/* Listening Tizimi uchun Audio pleyer interfeysi */}
           {isListening && (
-            <div className="glass rounded-2xl border border-white/10 p-5 space-y-4">
+            <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold uppercase tracking-widest text-sky-400 flex items-center gap-1.5">
                   <Volume2 size={13}/> Audio Track
                 </p>
                 {isExam && (
-                  <span className="text-[11px] bg-accent/20 text-accent px-2 py-0.5 rounded-full font-semibold">
-                    Exam Mode — no controls
+                  <span className="text-[11px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full font-semibold">
+                    Exam Mode — Player Locked
                   </span>
                 )}
               </div>
@@ -202,35 +253,50 @@ export function ReadingListeningInterface({ test, studentName, mode }: Props) {
                     <button
                       onClick={audioPaused ? startAudio : toggleAudio}
                       disabled={isExam && !audioPaused}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all
-                                  ${audioPaused
-                                    ? 'bg-sky-600 hover:bg-sky-500 text-white'
-                                    : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                        audioPaused
+                          ? 'bg-sky-600 hover:bg-sky-500 text-white'
+                          : 'bg-white/10 hover:bg-white/20 text-white'
+                      }`}
                     >
                       {audioPaused ? <Play size={16} className="ml-0.5"/> : <Pause size={16}/>}
                     </button>
+                    
                     <div className="flex-1">
                       <input
-                        type="range" min={0} max={audioDur || 100} value={audioTime}
+                        type="range" 
+                        min={0} 
+                        max={audioDur || 100} 
+                        value={audioTime}
                         onChange={e => seek(Number(e.target.value))}
                         disabled={isExam}
                         className="w-full h-1.5 accent-sky-500 cursor-pointer disabled:cursor-not-allowed"
                       />
-                      <div className="flex justify-between text-[10px] text-muted font-mono mt-1">
-                        <span>{fmt(audioTime)}</span>
-                        <span>{fmt(audioDur)}</span>
+                      <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
+                        <span>{formatAudioTime(audioTime)}</span>
+                        <span>{formatAudioTime(audioDur)}</span>
                       </div>
                     </div>
+
                     {!isExam && (
-                      <button onClick={() => setMuted(v => !v)}
-                        className="text-muted hover:text-white transition-colors">
+                      <button 
+                        onClick={() => setMuted(v => !v)}
+                        className="text-slate-400 hover:text-white transition-colors"
+                      >
                         {muted ? <VolumeX size={15}/> : <Volume2 size={15}/>}
                       </button>
                     )}
+                    
                     {!isExam && (
                       <button
-                        onClick={() => { if (audioRef.current) { audioRef.current.currentTime = Math.max(0, audioTime - 10); }}}
-                        className="text-muted hover:text-white transition-colors" title="Back 10s">
+                        onClick={() => { 
+                          if (audioRef.current) { 
+                            audioRef.current.currentTime = Math.max(0, audioTime - 10); 
+                          }
+                        }}
+                        className="text-slate-400 hover:text-white transition-colors" 
+                        title="Back 10s"
+                      >
                         <RotateCcw size={14}/>
                       </button>
                     )}
@@ -238,105 +304,115 @@ export function ReadingListeningInterface({ test, studentName, mode }: Props) {
                 </div>
               )}
 
-              {/* HTML-embedded audio */}
+              {/* Tashqaridan embed qilingan iframe audiolari uchun */}
               {test.has_embedded_audio && test.content_html && (
                 <div dangerouslySetInnerHTML={{ __html: test.content_html }} />
               )}
             </div>
           )}
 
-          {/* Content */}
-          {renderContent()}
+          {/* Matnli yoki PDF ko'rinishidagi test kontenti */}
+          <div className="h-full">
+            {renderContent()}
+          </div>
         </div>
       </div>
 
-      {/* ── RIGHT: Answer Sheet ───────────────────────────────── */}
-      <div className="flex flex-col bg-[#0f172a] border-l border-white/5">
-        <div className="p-4 border-b border-white/8 flex items-center justify-between bg-surface/60">
+      {/* ── O'NG TOMON: Answer Sheet (Javoblar varaqasi) ───────────────────────────────── */}
+      <div className="flex flex-col bg-[#0f172a] border-l border-white/10 h-screen">
+        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-slate-900/40">
           <div className="flex items-center gap-2">
-            <AlertCircle size={15} className="text-primary" />
+            <AlertCircle size={15} className="text-blue-400" />
             <span className="font-bold text-sm">Answer Sheet</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted font-mono">{answered}/{totalQ}</span>
+            <span className="text-xs text-slate-400 font-mono">{answered}/{totalQ}</span>
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="px-4 py-1.5 bg-primary hover:bg-emerald-400 text-white text-xs font-bold
-                         rounded-lg transition-colors disabled:opacity-50">
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+            >
               {submitting ? 'Grading…' : 'Finish Test'}
             </button>
           </div>
         </div>
-        {/* Progress */}
+
+        {/* To'ldirilish progress bar */}
         <div className="h-1 bg-white/5">
-          <div className="h-full bg-primary progress-fill" style={{width:`${(answered/totalQ)*100}%`}} />
+          <div 
+            className="h-full bg-blue-500 transition-all duration-300" 
+            style={{ width: `${(answered / totalQ) * 100}%` }} 
+          />
         </div>
 
+        {/* Input Javob maydonlari */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {Array.from({length: totalQ}, (_, i) => i + 1).map(n => (
+          {Array.from({ length: totalQ }, (_, i) => i + 1).map(n => (
             <div key={n} className="flex items-center gap-2.5">
-              <span className="w-7 text-right text-xs text-muted font-mono shrink-0">{n}</span>
+              <span className="w-7 text-right text-xs text-slate-400 font-mono shrink-0">{n}</span>
               <input
                 type="text"
                 value={answers[String(n)] ?? ''}
                 onChange={e => setAnswer(n, e.target.value)}
                 autoComplete="off"
                 spellCheck={false}
-                className="flex-1 bg-white/4 border border-white/10 rounded-lg px-3 py-1.5 text-sm
-                           focus:outline-none focus:border-primary/60 transition-colors uppercase
-                           placeholder:text-white/20"
-                placeholder="—"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 text-white uppercase placeholder:text-white/10 font-medium"
+                placeholder="Type answer..."
               />
             </div>
           ))}
         </div>
 
-        <div className="p-4 border-t border-white/8">
+        <div className="p-4 border-t border-white/10 bg-slate-900/20">
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full py-3 bg-primary hover:bg-emerald-400 text-white font-bold rounded-xl
-                       transition-colors text-sm disabled:opacity-50">
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm disabled:opacity-50 cursor-pointer"
+          >
             {submitting ? 'Grading…' : 'Submit & Grade'}
           </button>
         </div>
       </div>
 
-      {/* ── Result Modal ──────────────────────────────────────── */}
+      {/* ── Test Tugaganda Chiqadigan Natija Modali ──────────────────────────────────────── */}
       {showResult && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="glass w-full max-w-sm rounded-3xl p-10 text-center space-y-7 shadow-2xl"
+            className="bg-slate-900 border border-white/10 w-full max-w-sm rounded-3xl p-8 text-center space-y-6 shadow-2xl"
           >
-            <div className="w-20 h-20 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center mx-auto">
-              <CheckCircle2 size={36} className="text-primary" />
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto">
+              <CheckCircle2 size={32} className="text-emerald-400" />
             </div>
+            
             <div>
-              <h2 className="text-2xl font-extrabold mb-1">Test Submitted!</h2>
-              <p className="text-muted text-sm">Your answers have been graded instantly.</p>
+              <h2 className="text-2xl font-black text-white mb-1">Test Submitted!</h2>
+              <p className="text-slate-400 text-sm">Your answers have been evaluated successfully.</p>
             </div>
+            
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-5 bg-white/5 rounded-2xl border border-white/10">
-                <p className="text-xs text-muted uppercase tracking-widest mb-1">Raw Score</p>
-                <p className="text-3xl font-black">{score.raw} / {totalQ}</p>
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Raw Score</p>
+                <p className="text-2xl font-black text-white">{score.raw} / {totalQ}</p>
               </div>
-              <div className="p-5 bg-primary/10 rounded-2xl border border-primary/20">
-                <p className="text-xs text-primary uppercase tracking-widest mb-1 font-bold">Band Score</p>
-                <p className="text-3xl font-black text-primary">{score.band}</p>
+              <div className="p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20">
+                <p className="text-xs text-blue-400 uppercase tracking-wider mb-1 font-bold">Band Score</p>
+                <p className="text-2xl font-black text-blue-400">{score.band}</p>
               </div>
             </div>
-            <div className="space-y-3">
+            
+            <div className="space-y-3 pt-2">
               <button
                 onClick={() => window.location.href = `/review/${test.id}`}
-                className="w-full py-4 bg-primary hover:bg-emerald-400 text-white font-bold rounded-xl transition-colors">
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm cursor-pointer"
+              >
                 Review Answers
               </button>
               <button
                 onClick={() => window.location.href = '/'}
-                className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl transition-colors">
+                className="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-300 font-bold rounded-xl transition-colors text-sm cursor-pointer"
+              >
                 Back to Dashboard
               </button>
             </div>
@@ -345,10 +421,4 @@ export function ReadingListeningInterface({ test, studentName, mode }: Props) {
       )}
     </div>
   );
-}
-
-function fmt(s: number) {
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
