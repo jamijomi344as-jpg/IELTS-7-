@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
 import './globals.css';
-import { Navbar } from '@/components/shared/Navbar';
-import { TeacherLoginModal } from '@/components/shared/TeacherLoginModal';
+import Navbar from '@/components/Navbar';
+import TeacherLoginModal from '@/components/TeacherLoginModal';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="uz" className={geist.variable}>
-      <body className="min-h-screen bg-background text-foreground flex flex-col">
+      <body className="min-h-screen bg-background text-foreground flex flex-col antialiased">
         <Navbar />
         <TeacherLoginModal />
         <main className="flex-1 pt-[60px]">
