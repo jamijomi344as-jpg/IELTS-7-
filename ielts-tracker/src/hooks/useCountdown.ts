@@ -1,35 +1,39 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export function useCountdown(initialSeconds: number, autoStart = false) {
-  const [timeLeft, setTimeLeft] = useState(initialSeconds);
-  const [isActive, setIsActive] = useState(autoStart);
-  const ref = useRef<ReturnType<typeof setInterval> | null>(null);
+export function useCountdown(initialSecs: number, autoStart = false) {
+  const [secs, setSecs]       = useState(initialSecs);
+  const [running, setRunning] = useState(autoStart);
+  const interval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    setTimeLeft(initialSeconds);
-    setIsActive(autoStart);
-  }, [initialSeconds, autoStart]);
+    setSecs(initialSecs);
+    setRunning(autoStart);
+  }, [initialSecs, autoStart]);
 
   useEffect(() => {
-    if (!isActive) { if (ref.current) clearInterval(ref.current); return; }
-    if (timeLeft <= 0) { setIsActive(false); return; }
-    ref.current = setInterval(() => {
-      setTimeLeft(p => { if (p <= 1) { setIsActive(false); clearInterval(ref.current!); return 0; } return p - 1; });
+    if (!running) { interval.current && clearInterval(interval.current); return; }
+    if (secs <= 0) { setRunning(false); return; }
+    interval.current = setInterval(() => {
+      setSecs(p => {
+        if (p <= 1) { setRunning(false); clearInterval(interval.current!); return 0; }
+        return p - 1;
+      });
     }, 1000);
-    return () => { if (ref.current) clearInterval(ref.current); };
-  }, [isActive]);
+    return () => { interval.current && clearInterval(interval.current); };
+  }, [running]);
 
-  const start  = useCallback(() => setIsActive(true),  []);
-  const pause  = useCallback(() => setIsActive(false), []);
-  const reset  = useCallback((s?: number) => {
-    setTimeLeft(s ?? initialSeconds);
-    setIsActive(false);
-  }, [initialSeconds]);
+  const start  = useCallback(() => setRunning(true), []);
+  const pause  = useCallback(() => setRunning(false), []);
+  const reset  = useCallback((n?: number) => {
+    setSecs(n ?? initialSecs);
+    setRunning(false);
+  }, [initialSecs]);
 
-  const mm = Math.floor(timeLeft / 60);
-  const ss = timeLeft % 60;
-  const formattedTime = `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  const fmt = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const pct = initialSecs > 0 ? Math.round(((initialSecs - secs) / initialSecs) * 100) : 0;
 
-  return { timeLeft, formattedTime, isActive, start, pause, reset };
+  return { secs, fmt, running, pct, start, pause, reset };
 }
