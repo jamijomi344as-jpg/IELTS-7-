@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  BookOpen, Headphones, AlertCircle, CheckCircle2,
-  Pause, Play, Volume2, VolumeX, RotateCcw, Clock, HelpCircle,
+  BookOpen, Headphones, AlertCircle,
+  Pause, Play, Volume2, Clock, HelpCircle,
   Award, ChevronRight, RefreshCw, LogOut
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -32,7 +32,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const isListening = test.type === 'listening';
   const isExam      = mode === 'exam';
 
-  // 🔥 1. HTML EKANLIGINI TEKSHIRISH (TypeScript 'content' xatoligi (test as any) orqali hal qilindi)
+  // 🔥 HTML ekanligini tekshirish
   const rawContent = (test.content_html || (test as any).content || '').trim();
   const isHtmlFile = 
     (test.content_url && (test.content_url.endsWith('.html') || test.content_url.includes('html'))) ||
@@ -55,14 +55,23 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const [submitting, setSubmitting] = useState(false);
 
   const initSecs = isListening ? TIMER_LISTENING : TIMER_READING;
-  const { timeLeft, formattedTime, isActive, start, pause } = useCountdown(initSecs, true);
+  
+  // 🛠️ TO'G'RILANDI: Custom hook qaytarayotgan haqiqiy xususiyatlarni destructuring alias orqali kodingizga moslashtirdik
+  const { 
+    secs: timeLeft, 
+    fmt: formattedTime, 
+    running: isActive, 
+    start, 
+    pause 
+  } = useCountdown(initSecs, true);
+
   const timerColor = timeLeft < 300 ? 'text-rose-500' : timeLeft < 600 ? 'text-amber-400' : 'text-blue-400';
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioPaused, setAudioPaused] = useState(true);
   const [audioTime, setAudioTime]     = useState(0);
   const [audioDur, setAudioDur]       = useState(0);
-  const [muted, setMuted]             = useState(false);
+  const [muted]                       = useState(false);
 
   useEffect(() => {
     if (!isHtmlFile) {
@@ -154,29 +163,27 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const totalQ   = test.answer_key?.length || 40;
   const answered = Object.values(answers).filter(v => v.trim()).length;
 
-  // ── 🌍 INTERAKTIV HTML REJIMI (Vb-sahifa ko'rinishida to'liq render qilish) ──
+  // ── 🌍 INTERAKTIV HTML REJIMI ──
   if (isHtmlFile) {
     const htmlSrc = test.content_url || `data:text/html;charset=utf-8,${encodeURIComponent(rawContent)}`;
 
     return (
       <div className="w-screen h-screen bg-slate-950 flex flex-col overflow-hidden select-none">
-        {/* Yuqori boshqaruv paneli */}
         <div className="bg-slate-900 border-b border-white/10 px-6 py-3 flex items-center justify-between z-10 shadow-lg">
           <div className="flex items-center gap-3">
             <span className="px-2.5 py-1 bg-gradient-to-r from-sky-500 to-blue-600 text-white text-xs font-black rounded-md border border-sky-400/30 uppercase tracking-wider">
               Interactive Exam Mode
-            </span>
+            </span> 
             <h1 className="font-bold text-sm text-white tracking-wide">{test.title}</h1>
           </div>
           <button 
-            onClick={() => window.location.href = '/'}
+            onClick={() => { window.location.href = '/'; }}
             className="flex items-center gap-2 px-4 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-bold transition-all transform hover:scale-105 active:scale-95 cursor-pointer"
           >
             <LogOut size={13} /> Dashboardga Qaytish
           </button>
         </div>
         
-        {/* Vizual HTML Iframe */}
         <div className="flex-1 w-full h-full bg-white relative">
           <iframe 
             src={htmlSrc}
@@ -190,7 +197,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     );
   }
 
-  // ── 3️⃣ NATIJALAR EKRANI (PDF TESTLAR TUGAGANDA ChIQADIGAN INTERFEYS) ──
+  // ── 3️⃣ NATIJALAR EKRANI ──
   if (showResult) {
     return (
       <div className="min-h-screen bg-[#020817] flex items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950">
@@ -223,13 +230,13 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
 
           <div className="space-y-2.5 pt-2">
             <button 
-              onClick={() => window.location.reload()} 
+              onClick={() => { window.location.reload(); }} 
               className="w-full py-3.5 bg-white text-slate-950 font-bold rounded-xl text-sm transition-all hover:bg-slate-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 cursor-pointer"
             >
               <RefreshCw size={15} /> Qayta urinib ko&apos;rish
             </button>
             <button 
-              onClick={() => window.location.href = '/'}
+              onClick={() => { window.location.href = '/'; }}
               className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 border border-white/5 text-slate-300 font-bold rounded-xl text-sm transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
             >
               Dashboardga qaytish <ChevronRight size={15} />
@@ -240,7 +247,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     );
   }
 
-  // ── 4️⃣ STANDART REJIM (PDF TESTLAR UChUN SPLIT-SCREEN INTERFEYS) ──
+  // ── 4️⃣ STANDART REJIM (PDF SPLIT-SCREEN) ──
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 min-h-screen bg-[#020817] text-white">
       {/* CHAP TOMON */}
