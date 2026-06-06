@@ -1,6 +1,6 @@
 'use client';
 import { motion } from 'framer-motion';
-import { Timer, BookOpen, X } from 'lucide-react';
+import { Timer, BookOpen, X, Zap, Volume2 } from 'lucide-react';
 import type { Test } from '@/types';
 
 interface Props {
@@ -10,61 +10,90 @@ interface Props {
 }
 
 export function ExamModeModal({ test, onSelect, onClose }: Props) {
+  const isListening = test.type === 'listening';
+
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/75 backdrop-blur-lg">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 16 }}
+        initial={{ opacity: 0, scale: 0.93, y: 14 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.25 }}
-        className="glass w-full max-w-md rounded-3xl p-8 space-y-6 shadow-2xl"
+        className="glass w-full max-w-md rounded-2xl p-7 shadow-2xl"
       >
-        <div className="flex items-start justify-between">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-5">
           <div>
-            <h2 className="text-xl font-extrabold">Choose Mode</h2>
-            <p className="text-muted text-sm mt-0.5">{test.title}</p>
+            <h2 className="font-extrabold text-lg">Rejim tanlang</h2>
+            <p className="text-muted text-sm mt-0.5 truncate max-w-[280px]">{test.title}</p>
           </div>
           <button onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full text-muted transition-colors">
-            <X size={18} />
+            className="p-1.5 hover:bg-white/10 rounded-lg text-muted transition-colors">
+            <X size={16} />
           </button>
         </div>
 
-        <div className="grid gap-4">
+        <div className="grid gap-3">
           {/* EXAM MODE */}
-          <button
-            onClick={() => onSelect('exam')}
-            className="p-5 rounded-2xl border border-accent/30 bg-accent/10 text-left
-                       hover:border-accent/60 hover:bg-accent/15 transition-all group"
-          >
+          <button onClick={() => onSelect('exam')}
+            className="p-5 rounded-xl border border-accent/25 bg-accent/8 text-left
+                       hover:border-accent/50 hover:bg-accent/12 transition-all group">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-xl bg-accent/20 flex items-center justify-center">
-                <Timer size={18} className="text-accent" />
+              <div className="w-9 h-9 rounded-lg bg-accent/20 border border-accent/30
+                              flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Timer size={17} className="text-accent" />
               </div>
-              <span className="font-extrabold text-base text-accent">Exam Mode</span>
+              <div>
+                <p className="font-extrabold text-accent">EXAM Mode</p>
+                <p className="text-xs text-muted">Haqiqiy imtihon sharoiti</p>
+              </div>
             </div>
-            <ul className="text-sm text-white/60 space-y-1 ml-12">
-              <li>• Strict IELTS countdown timer — cannot be paused</li>
-              <li>• Listening audio plays once — no rewind or pause</li>
-              <li>• Simulates real test conditions</li>
+            <ul className="space-y-1 ml-12">
+              <li className="flex items-center gap-2 text-xs text-white/55">
+                <Zap size={11} className="text-accent/60" />
+                Taymer to'xtatib bo'lmaydi
+              </li>
+              {isListening && (
+                <li className="flex items-center gap-2 text-xs text-white/55">
+                  <Volume2 size={11} className="text-accent/60" />
+                  Audio — ortga qaytarish va to'xtatish YO'Q
+                </li>
+              )}
+              <li className="flex items-center gap-2 text-xs text-white/55">
+                <Zap size={11} className="text-accent/60" />
+                Haqiqiy IELTS sharoitiga tayyorlanasiz
+              </li>
             </ul>
           </button>
 
           {/* EXERCISE MODE */}
-          <button
-            onClick={() => onSelect('exercise')}
-            className="p-5 rounded-2xl border border-primary/30 bg-primary/10 text-left
-                       hover:border-primary/60 hover:bg-primary/15 transition-all group"
-          >
+          <button onClick={() => onSelect('exercise')}
+            className="p-5 rounded-xl border border-primary/25 bg-primary/8 text-left
+                       hover:border-primary/50 hover:bg-primary/12 transition-all group">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
-                <BookOpen size={18} className="text-primary" />
+              <div className="w-9 h-9 rounded-lg bg-primary/20 border border-primary/30
+                              flex items-center justify-center group-hover:scale-105 transition-transform">
+                <BookOpen size={17} className="text-primary" />
               </div>
-              <span className="font-extrabold text-base text-primary">Exercise Mode</span>
+              <div>
+                <p className="font-extrabold text-primary">EXERCISE Mode</p>
+                <p className="text-xs text-muted">Erkin mashq rejimi</p>
+              </div>
             </div>
-            <ul className="text-sm text-white/60 space-y-1 ml-12">
-              <li>• Timer can be paused and resumed freely</li>
-              <li>• Full audio control: rewind, fast-forward, pause</li>
-              <li>• Best for learning and practice drills</li>
+            <ul className="space-y-1 ml-12">
+              <li className="flex items-center gap-2 text-xs text-white/55">
+                <Zap size={11} className="text-primary/60" />
+                Taymerni to'xtatib, davom ettirish mumkin
+              </li>
+              {isListening && (
+                <li className="flex items-center gap-2 text-xs text-white/55">
+                  <Volume2 size={11} className="text-primary/60" />
+                  Audio — ortga qaytarish va to'xtatish MUMKIN
+                </li>
+              )}
+              <li className="flex items-center gap-2 text-xs text-white/55">
+                <Zap size={11} className="text-primary/60" />
+                O'rganish va tahlil qilish uchun ideal
+              </li>
             </ul>
           </button>
         </div>
