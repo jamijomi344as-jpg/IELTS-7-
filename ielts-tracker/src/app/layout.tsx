@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist } from 'next/font/google';
 import './globals.css';
-import Navbar from '@/components/Navbar';
+import { Navbar } from '@/components/Navbar';
 import TeacherLogin from '@/components/TeacherLogin';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
