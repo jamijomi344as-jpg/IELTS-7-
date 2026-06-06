@@ -87,7 +87,7 @@ export interface ProgressTracker {
   id: string;
   student_name: string;
   date_key: string;
-  daily_tasks: Record<string, boolean>;
+  completed_daily_tasks: Record<string, boolean>;
   grid_14day: Record<string, {
     input: Record<string, boolean>;
     output: Record<string, boolean>;
