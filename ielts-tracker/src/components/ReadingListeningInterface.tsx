@@ -32,7 +32,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const isListening = test.type === 'listening';
   const isExam      = mode === 'exam';
 
-  // 🔥 HTML ekanligini tekshirish
+  // HTML ekanligini tekshirish
   const rawContent = (test.content_html || (test as any).content || '').trim();
   const isHtmlFile = 
     (test.content_url && (test.content_url.endsWith('.html') || test.content_url.includes('html'))) ||
@@ -56,7 +56,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
 
   const initSecs = isListening ? TIMER_LISTENING : TIMER_READING;
   
-  // 🛠️ TO'G'RILANDI: Custom hook qaytarayotgan haqiqiy xususiyatlarni destructuring alias orqali kodingizga moslashtirdik
+  // Custom hook qaytarayotgan haqiqiy ob'ekt xususiyatlarini destructuring alias orqali to'g'rilaymiz
   const { 
     secs: timeLeft, 
     fmt: formattedTime, 
@@ -118,12 +118,15 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
       pause();
     }
 
-    const key = test.answer_key ?? [];
+    // TypeScript xatoligini oldini olish uchun answer_key massiv ekanligini qat'iy tekshiramiz
+    const key = Array.isArray(test.answer_key) ? test.answer_key : [];
     let correct = 0;
     
-    key.forEach((ans, i) => {
-      if ((answers[String(i + 1)] ?? '').trim().toLowerCase() === ans.trim().toLowerCase()) {
-        correct++;
+    key.forEach((ans: any, i: number) => {
+      if (ans && typeof ans === 'string') {
+        if ((answers[String(i + 1)] ?? '').trim().toLowerCase() === ans.trim().toLowerCase()) {
+          correct++;
+        }
       }
     });
     
@@ -160,7 +163,7 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
     }
   }, [timeLeft, isExam, showResult, handleSubmit, isHtmlFile]);
 
-  const totalQ   = test.answer_key?.length || 40;
+  const totalQ   = (Array.isArray(test.answer_key) ? test.answer_key.length : 0) || 40;
   const answered = Object.values(answers).filter(v => v.trim()).length;
 
   // ── 🌍 INTERAKTIV HTML REJIMI ──
