@@ -32,8 +32,8 @@ export default function ReadingListeningInterface({ test, studentName, mode }: P
   const isListening = test.type === 'listening';
   const isExam      = mode === 'exam';
 
-  // 🔥 1. HTML EKANLIGINI TEKSHIRISHNI KUChAYTIRAMIZ (Barcha maydonlarni tekshiradi)
-const rawContent = (test.content_html || (test as any).content || '').trim();
+  // 🔥 1. HTML EKANLIGINI TEKSHIRISH (TypeScript 'content' xatoligi (test as any) orqali hal qilindi)
+  const rawContent = (test.content_html || (test as any).content || '').trim();
   const isHtmlFile = 
     (test.content_url && (test.content_url.endsWith('.html') || test.content_url.includes('html'))) ||
     rawContent.startsWith('<!DOCTYPE') || 
@@ -154,9 +154,8 @@ const rawContent = (test.content_html || (test as any).content || '').trim();
   const totalQ   = test.answer_key?.length || 40;
   const answered = Object.values(answers).filter(v => v.trim()).length;
 
-  // ── 🌍 2. INTERAKTIV HTML REJIMI (KOD STRINGINI VIZUAL EKANGA O'TKAZISh) ──
+  // ── 🌍 INTERAKTIV HTML REJIMI (Vb-sahifa ko'rinishida to'liq render qilish) ──
   if (isHtmlFile) {
-    // Agar kod text sifatida kelayotgan bo'lsa, uni xavfsiz iframe source-ga o'giramiz
     const htmlSrc = test.content_url || `data:text/html;charset=utf-8,${encodeURIComponent(rawContent)}`;
 
     return (
@@ -177,7 +176,7 @@ const rawContent = (test.content_html || (test as any).content || '').trim();
           </button>
         </div>
         
-        {/* HTML iframe — barcha scriptlari bilan to'liq vizual holatda ishlaydi */}
+        {/* Vizual HTML Iframe */}
         <div className="flex-1 w-full h-full bg-white relative">
           <iframe 
             src={htmlSrc}
@@ -213,7 +212,7 @@ const rawContent = (test.content_html || (test as any).content || '').trim();
 
           <div className="grid grid-cols-2 gap-4 p-4 bg-slate-950/40 rounded-2xl border border-white/5">
             <div className="p-3 text-center">
-              <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">To'g'ri Javoblar</p>
+              <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">To&apos;g&apos;ri Javoblar</p>
               <p className="text-2xl font-black text-white mt-1 font-mono">{score.raw}<span className="text-xs text-slate-500 font-normal"> / {totalQ}</span></p>
             </div>
             <div className="p-3 text-center border-l border-white/5">
@@ -227,7 +226,7 @@ const rawContent = (test.content_html || (test as any).content || '').trim();
               onClick={() => window.location.reload()} 
               className="w-full py-3.5 bg-white text-slate-950 font-bold rounded-xl text-sm transition-all hover:bg-slate-200 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 cursor-pointer"
             >
-              <RefreshCw size={15} /> Qayta urinib ko'rish
+              <RefreshCw size={15} /> Qayta urinib ko&apos;rish
             </button>
             <button 
               onClick={() => window.location.href = '/'}
@@ -241,7 +240,7 @@ const rawContent = (test.content_html || (test as any).content || '').trim();
     );
   }
 
-  // ── 4️⃣ STANDART REJIM (PDF TESTLAR UChUN INTERFEYS) ──
+  // ── 4️⃣ STANDART REJIM (PDF TESTLAR UChUN SPLIT-SCREEN INTERFEYS) ──
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 min-h-screen bg-[#020817] text-white">
       {/* CHAP TOMON */}
@@ -272,7 +271,7 @@ const rawContent = (test.content_html || (test as any).content || '').trim();
         </div>
 
         <div className="flex-1 p-6 space-y-5">
-          {isListening && !test.has_embedded_audio && test.audio_url && (
+          {isListening && !(test as any).has_embedded_audio && test.audio_url && (
             <div className="bg-slate-900/50 backdrop-blur-md rounded-2xl border border-white/10 p-5 space-y-4 shadow-xl">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold uppercase tracking-widest text-sky-400 flex items-center gap-1.5">
@@ -320,7 +319,7 @@ const rawContent = (test.content_html || (test as any).content || '').trim();
             {test.content_url ? (
               <iframe src={`${test.content_url}#toolbar=0&navpanes=0`} className="w-full h-full border-none" title="PDF Content" />
             ) : (
-              <div className="prose prose-invert prose-sm p-4" dangerouslySetInnerHTML={{ __html: test.content_html || test.content || '' }} />
+              <div className="prose prose-invert prose-sm p-4" dangerouslySetInnerHTML={{ __html: test.content_html || (test as any).content || '' }} />
             )}
           </div>
         </div>
