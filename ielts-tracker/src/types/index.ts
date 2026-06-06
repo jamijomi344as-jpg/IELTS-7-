@@ -211,10 +211,14 @@ export const INPUT_TASKS = [
 ] as const;
 
 export const OUTPUT_TASKS = [
-  { id: 'reading_full',   label: 'Reading Passages 1, 2, 3',        note: 'To\'liq test, qattiq imtihon sharoitida'         },
+  { id: 'reading_full',   label: 'Reading Passages 1, 2, 3',         note: 'To\'liq test, qattiq imtihon sharoitida'         },
   { id: 'listening_full', label: 'Listening Sections 1, 2, 3, 4',  note: 'To\'liq test, imlo/ko\'plik auditini o\'tkazing' },
   { id: 'writing_full',   label: 'Writing Task 1 / 2',              note: 'Ilg\'or umumiy ko\'rinish yoki PEEL paragraf'     },
   { id: 'speaking_full',  label: 'Speaking Parts 1, 2, 3',          note: 'Yozing, transkripsiya qiling, qayta yozing'      },
 ] as const;
 
 export const DAYS_14 = Array.from({ length: 14 }, (_, i) => `D${i + 1}`);
+
+// ── Render va page.tsx xatoligini to'g'rilash uchun alias eksportlar ──
+export const INPUT_TASKS_14 = INPUT_TASKS;
+export const OUTPUT_TASKS_14 = OUTPUT_TASKS;
