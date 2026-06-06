@@ -99,6 +99,7 @@ export default function HomePage() {
     setShowModeModal(true);
   }
 
+  // Mode chosen handler
   function onModeChosen(mode: 'exam' | 'exercise') {
     if (!selectedTest) return;
     setShowModeModal(false);
@@ -113,7 +114,7 @@ export default function HomePage() {
     setTracker(prev => prev
       ? { ...prev, completed_daily_tasks: updated }
       : { id:'', student_name: studentName, date_key: today,
-          completed_daily_tasks: updated, completed_fourteen_day_grid: {} }
+          completed_daily_tasks: updated, grid_14day: {} }
     );
     await supabase.from('student_progress_trackers').upsert(
       { student_name: studentName, date_key: today, completed_daily_tasks: updated },
@@ -124,19 +125,19 @@ export default function HomePage() {
   // ── Toggle 14-day cell ───────────────────────────────────────
   async function toggle14Day(day: string, kind: 'input'|'output', taskId: string) {
     if (!studentName) return;
-    const grid    = tracker?.completed_fourteen_day_grid ?? {};
+    const grid    = tracker?.grid_14day ?? {}; // ✅ To'g'rilandi: grid_14day ishlatildi
     const dayData = grid[day] ?? { input:{}, output:{} };
     const updated = {
       ...grid,
       [day]: { ...dayData, [kind]: { ...dayData[kind], [taskId]: !dayData[kind]?.[taskId] } },
     };
     setTracker(prev => prev
-      ? { ...prev, completed_fourteen_day_grid: updated }
+      ? { ...prev, grid_14day: updated } // ✅ To'g'rilandi: grid_14day ishlatildi
       : { id:'', student_name: studentName, date_key: today,
-          completed_daily_tasks: {}, completed_fourteen_day_grid: updated }
+          completed_daily_tasks: {}, grid_14day: updated } // ✅ To'g'rilandi: grid_14day ishlatildi
     );
     await supabase.from('student_progress_trackers').upsert(
-      { student_name: studentName, date_key: today, completed_fourteen_day_grid: updated },
+      { student_name: studentName, date_key: today, grid_14day: updated }, // ✅ Ma'lumotlar bazasi uchun ham to'g'rilandi
       { onConflict: 'student_name,date_key' }
     );
   }
@@ -236,7 +237,7 @@ export default function HomePage() {
                 onToggle={toggleDailyTask}
               />
               <FourteenDaySection
-                grid={tracker?.completed_fourteen_day_grid ?? {}}
+                grid={tracker?.grid_14day ?? {}} // ✅ To'g'rilandi: grid_14day uzatildi
                 onToggle={toggle14Day}
               />
             </motion.div>
